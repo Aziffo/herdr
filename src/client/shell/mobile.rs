@@ -122,7 +122,10 @@ fn render_header_status(
         name_width.saturating_sub(3),
         &crate::ui::truncate_end(&workspace.label, usize::from(name_width.saturating_sub(4))),
         Style::default()
-            .fg(palette.text)
+            .fg(workspace
+                .highlight
+                .map(|color| palette.highlight_color(color))
+                .unwrap_or(palette.text))
             .bg(palette.panel_bg)
             .add_modifier(Modifier::BOLD),
     );
@@ -132,7 +135,15 @@ fn render_header_status(
         area.y,
         tab_width.saturating_sub(1),
         &tab_status,
-        Style::default().fg(palette.overlay1).bg(palette.panel_bg),
+        Style::default()
+            .fg(snapshot
+                .tabs
+                .iter()
+                .find(|tab| Some(&tab.tab_id) == snapshot.focused_tab_id.as_ref())
+                .and_then(|tab| tab.highlight)
+                .map(|color| palette.highlight_color(color))
+                .unwrap_or(palette.overlay1))
+            .bg(palette.panel_bg),
     );
     if area.height > 1 {
         render_agent_summary(
@@ -690,10 +701,15 @@ fn mobile_items(
             } else {
                 palette.panel_bg
             };
+            let highlight = tab
+                .and_then(|tab| tab.highlight)
+                .or(workspace.and_then(|workspace| workspace.highlight));
             let foreground = if endpoint.stale() {
                 palette.overlay0
             } else {
-                palette.text
+                highlight
+                    .map(|color| palette.highlight_color(color))
+                    .unwrap_or(palette.text)
             };
             let dim = if endpoint.stale() {
                 Modifier::DIM
@@ -808,7 +824,10 @@ fn mobile_items(
             let foreground = if endpoint.stale() {
                 palette.overlay0
             } else {
-                palette.text
+                workspace
+                    .highlight
+                    .map(|color| palette.highlight_color(color))
+                    .unwrap_or(palette.text)
             };
             let status = if endpoint.stale() {
                 palette.overlay0

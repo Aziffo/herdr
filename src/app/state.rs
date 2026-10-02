@@ -74,6 +74,58 @@ pub struct Palette {
 }
 
 impl Palette {
+    pub(crate) fn highlight_color(&self, color: crate::workspace::HighlightColor) -> Color {
+        use crate::workspace::HighlightColor;
+        match color {
+            HighlightColor::Red => self.red,
+            HighlightColor::Peach => self.peach,
+            HighlightColor::Yellow => self.yellow,
+            HighlightColor::Green => self.green,
+            HighlightColor::Teal => self.teal,
+            HighlightColor::Blue => self.blue,
+            HighlightColor::Mauve => self.mauve,
+            HighlightColor::Gray => self.overlay0,
+        }
+    }
+
+    pub(crate) fn highlight_foreground(&self, color: crate::workspace::HighlightColor) -> Color {
+        match self.highlight_color(color) {
+            Color::Rgb(r, g, b) => {
+                let linear = |channel: u8| {
+                    let value = f64::from(channel) / 255.0;
+                    if value <= 0.04045 {
+                        value / 12.92
+                    } else {
+                        ((value + 0.055) / 1.055).powf(2.4)
+                    }
+                };
+                let luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+                if luminance > 0.179 {
+                    Color::Black
+                } else {
+                    Color::White
+                }
+            }
+            Color::Yellow
+            | Color::Gray
+            | Color::DarkGray
+            | Color::LightRed
+            | Color::LightGreen
+            | Color::LightYellow
+            | Color::LightMagenta
+            | Color::LightCyan
+            | Color::White => Color::Black,
+            Color::Black
+            | Color::Red
+            | Color::Green
+            | Color::Blue
+            | Color::Magenta
+            | Color::Cyan
+            | Color::LightBlue => Color::White,
+            _ => self.text,
+        }
+    }
+
     /// Catppuccin Mocha — the default.
     pub fn catppuccin() -> Self {
         Self {
@@ -1378,6 +1430,47 @@ mod tests {
             (a.max(b), a.min(b))
         };
         (lighter + 0.05) / (darker + 0.05)
+    }
+
+    #[test]
+    fn highlight_uses_theme_tokens_and_readable_foregrounds() {
+        use crate::workspace::HighlightColor;
+        let terminal = Palette::terminal();
+        assert_eq!(
+            terminal.highlight_foreground(HighlightColor::Yellow),
+            Color::Black
+        );
+        assert_eq!(
+            terminal.highlight_foreground(HighlightColor::Blue),
+            Color::White
+        );
+        for name in crate::config::THEME_NAMES {
+            let palette = Palette::from_name(name).unwrap();
+            for (color, token) in HighlightColor::ALL.into_iter().zip([
+                palette.red,
+                palette.peach,
+                palette.yellow,
+                palette.green,
+                palette.teal,
+                palette.blue,
+                palette.mauve,
+                palette.overlay0,
+            ]) {
+                assert_eq!(palette.highlight_color(color), token);
+                if let Color::Rgb(..) = token {
+                    let foreground = match palette.highlight_foreground(color) {
+                        Color::Black => Color::Rgb(0, 0, 0),
+                        Color::White => Color::Rgb(255, 255, 255),
+                        color => color,
+                    };
+                    assert!(
+                        contrast_ratio(token, foreground) >= 4.5,
+                        "{name}: {}",
+                        color.key()
+                    );
+                }
+            }
+        }
     }
 
     #[test]
