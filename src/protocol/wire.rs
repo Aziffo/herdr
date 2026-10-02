@@ -898,7 +898,7 @@ impl FrameData {
     }
 }
 
-fn deserialize_client_shell_agent_status<'de, D>(
+pub(super) fn deserialize_client_shell_agent_status<'de, D>(
     deserializer: D,
 ) -> Result<crate::api::schema::AgentStatus, D::Error>
 where
@@ -1023,7 +1023,7 @@ pub struct ClientShellTabStatusSegment {
     pub accent: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientShellWorkspace {
     pub workspace_id: String,
     pub active_tab_id: String,
@@ -1036,8 +1036,8 @@ pub struct ClientShellWorkspace {
     pub tokens: Vec<(String, String)>,
     pub worktree: Option<ClientShellWorktree>,
     pub focused: bool,
-    #[serde(deserialize_with = "deserialize_client_shell_agent_status")]
     pub agent_status: crate::api::schema::AgentStatus,
+    pub highlight: Option<crate::workspace::HighlightColor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1047,7 +1047,7 @@ pub struct ClientShellWorktree {
     pub is_linked_worktree: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientShellTab {
     pub tab_id: String,
     pub workspace_id: String,
@@ -1056,8 +1056,8 @@ pub struct ClientShellTab {
     pub custom_label: bool,
     pub zoomed: bool,
     pub focused: bool,
-    #[serde(deserialize_with = "deserialize_client_shell_agent_status")]
     pub agent_status: crate::api::schema::AgentStatus,
+    pub highlight: Option<crate::workspace::HighlightColor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2706,6 +2706,7 @@ mod tests {
             agent_view_label: None,
             agent_order: Vec::new(),
             workspaces: vec![ClientShellWorkspace {
+                highlight: None,
                 workspace_id: "w1".into(),
                 active_tab_id: "w1:t1".into(),
                 new_workspace_cwd: "/tmp".into(),
@@ -2720,6 +2721,7 @@ mod tests {
                 agent_status: crate::api::schema::AgentStatus::Idle,
             }],
             tabs: vec![ClientShellTab {
+                highlight: None,
                 tab_id: "w1:t1".into(),
                 workspace_id: "w1".into(),
                 number: 1,

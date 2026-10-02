@@ -37,6 +37,7 @@ enum SplitCommand<'a> {
 
 pub struct Tab {
     pub custom_name: Option<String>,
+    pub highlight: Option<crate::workspace::HighlightColor>,
     pub number: usize,
     /// Identity source for this tab's pane tree.
     pub root_pane: PaneId,
@@ -181,6 +182,7 @@ impl Tab {
         Ok((
             Self {
                 custom_name: None,
+                highlight: None,
                 number,
                 root_pane: root_id,
                 layout,
@@ -199,6 +201,14 @@ impl Tab {
 
     pub fn is_auto_named(&self) -> bool {
         self.custom_name.is_none()
+    }
+
+    pub fn set_highlight(&mut self, color: crate::workspace::HighlightColor) {
+        self.highlight = Some(color);
+    }
+
+    pub fn clear_highlight(&mut self) {
+        self.highlight = None;
     }
 
     pub fn set_custom_name(&mut self, name: String) {
@@ -444,6 +454,7 @@ impl Tab {
         panes.insert(pane_id, moved.pane_state);
         Self {
             custom_name,
+            highlight: None,
             number,
             root_pane: pane_id,
             layout: TileLayout::from_saved(Node::Pane(pane_id), pane_id),

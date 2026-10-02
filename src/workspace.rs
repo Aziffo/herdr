@@ -15,6 +15,79 @@ use crate::pane::{PaneLaunchEnv, PaneState};
 use crate::render_signal::RenderSignal;
 use crate::terminal::{TerminalId, TerminalRuntime, TerminalRuntimeRegistry, TerminalState};
 
+/// Fixed, theme-independent session highlight selection.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum HighlightColor {
+    Red,
+    Peach,
+    Yellow,
+    Green,
+    Teal,
+    Blue,
+    Mauve,
+    Gray,
+}
+
+impl HighlightColor {
+    pub const ALL: [Self; 8] = [
+        Self::Red,
+        Self::Peach,
+        Self::Yellow,
+        Self::Green,
+        Self::Teal,
+        Self::Blue,
+        Self::Mauve,
+        Self::Gray,
+    ];
+
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::Red => "red",
+            Self::Peach => "peach",
+            Self::Yellow => "yellow",
+            Self::Green => "green",
+            Self::Teal => "teal",
+            Self::Blue => "blue",
+            Self::Mauve => "mauve",
+            Self::Gray => "gray",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Red => "Red",
+            Self::Peach => "Peach",
+            Self::Yellow => "Yellow",
+            Self::Green => "Green",
+            Self::Teal => "Teal",
+            Self::Blue => "Blue",
+            Self::Mauve => "Mauve",
+            Self::Gray => "Gray",
+        }
+    }
+
+    pub fn parse_optional(value: Option<&str>) -> Result<Option<Self>, &'static str> {
+        match value {
+            None | Some("none") => Ok(None),
+            Some(value) => value.parse().map(Some),
+        }
+    }
+}
+
+impl std::str::FromStr for HighlightColor {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .into_iter()
+            .find(|color| color.key() == value)
+            .ok_or("highlight must be none, red, peach, yellow, green, teal, blue, mauve, or gray")
+    }
+}
+
 mod aggregate;
 mod git;
 mod tab;
@@ -178,6 +251,7 @@ pub struct Workspace {
     pub id: String,
     /// User-provided override. If set, auto-derived identity stops updating.
     pub custom_name: Option<String>,
+    pub highlight: Option<crate::workspace::HighlightColor>,
     /// Fallback workspace identity source for tests, old snapshots, or missing runtimes.
     pub identity_cwd: PathBuf,
     /// CWD from which the cached automatic label and Git metadata were derived.
@@ -252,6 +326,7 @@ impl Workspace {
         Self {
             id,
             custom_name: label,
+            highlight: None,
             identity_cwd: identity_cwd.clone(),
             cached_identity_cwd: identity_cwd.clone(),
             cached_auto_label,
@@ -404,6 +479,7 @@ impl Workspace {
             Self {
                 id,
                 custom_name: None,
+                highlight: None,
                 identity_cwd: initial_cwd.clone(),
                 cached_identity_cwd: initial_cwd.clone(),
                 cached_auto_label,
@@ -999,6 +1075,14 @@ impl Workspace {
         self.public_tab_number(tab_idx)
     }
 
+    pub fn set_highlight(&mut self, color: crate::workspace::HighlightColor) {
+        self.highlight = Some(color);
+    }
+
+    pub fn clear_highlight(&mut self) {
+        self.highlight = None;
+    }
+
     pub fn set_custom_name(&mut self, name: String) {
         self.custom_name = Some(name);
     }
@@ -1178,6 +1262,7 @@ impl Workspace {
         panes.insert(root_id, PaneState::new(terminal_id));
         let tab = Tab {
             custom_name: None,
+            highlight: None,
             number: 1,
             root_pane: root_id,
             layout,
@@ -1193,6 +1278,7 @@ impl Workspace {
         Self {
             id: generate_workspace_id(),
             custom_name: Some(name.to_string()),
+            highlight: None,
             identity_cwd: identity_cwd.clone(),
             cached_identity_cwd: identity_cwd.clone(),
             cached_auto_label: fallback_label_from_cwd(&identity_cwd),
@@ -1234,6 +1320,7 @@ impl Workspace {
         panes.insert(root_id, PaneState::new(TerminalId::alloc()));
         let tab = Tab {
             custom_name: name.map(str::to_string),
+            highlight: None,
             number: self.next_public_tab_number,
             root_pane: root_id,
             layout,
