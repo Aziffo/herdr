@@ -602,6 +602,7 @@ fn expanded_machine_sidebar_reveals_newly_focused_workspace() {
     let template = initial.workspaces[0].clone();
     initial.workspaces = (1..=12)
         .map(|number| ClientShellWorkspace {
+            highlight: None,
             workspace_id: format!("ws_{number}"),
             number,
             label: format!("space-{number}"),
@@ -613,6 +614,7 @@ fn expanded_machine_sidebar_reveals_newly_focused_workspace() {
     let mut remote = initial.clone();
     remote.boot_id = "remote-boot".into();
     remote.workspaces.push(ClientShellWorkspace {
+        highlight: None,
         workspace_id: "ws_13".into(),
         number: 13,
         focused: false,
@@ -626,6 +628,7 @@ fn expanded_machine_sidebar_reveals_newly_focused_workspace() {
     let mut update = state.snapshot.as_deref().expect("snapshot").clone();
     update.revision = 2;
     update.workspaces.push(ClientShellWorkspace {
+        highlight: None,
         workspace_id: "ws_13".into(),
         number: 13,
         label: "new-space".into(),

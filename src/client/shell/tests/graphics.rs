@@ -257,6 +257,9 @@ fn every_dialog_and_menu_occludes_its_panel_not_the_whole_screen() {
             force_confirmation: false,
         }),
         ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
+            highlight: None,
+            open_submenu: false,
+            submenu_highlighted: 0,
             target: ClientContextMenuTarget::Tab {
                 tab_id: "tab_1".into(),
                 workspace_id: "ws_1".into(),
