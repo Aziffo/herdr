@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Highlight tabs and workspaces with eight theme colors from the native context menu or CLI. Highlights persist across restarts.
+
 ## [0.9.1] - 2026-09-16
 
 ### Added

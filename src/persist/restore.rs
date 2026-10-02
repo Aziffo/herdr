@@ -410,6 +410,7 @@ fn restore_workspace(
         Some(Workspace {
             id: workspace_id,
             custom_name: snap.custom_name.clone(),
+            highlight: snap.highlight,
             identity_cwd: snap.identity_cwd.clone(),
             cached_identity_cwd: snap.identity_cwd.clone(),
             cached_auto_label,
@@ -717,6 +718,7 @@ fn restore_tab(
         Some((
             crate::workspace::Tab {
                 custom_name: snap.custom_name.clone(),
+                highlight: snap.highlight,
                 number,
                 root_pane,
                 layout,
@@ -1168,13 +1170,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn restore_carries_persisted_agent_session_metadata() {
+    async fn restore_carries_persisted_highlight_and_agent_session_metadata() {
         let cwd = std::env::current_dir().unwrap();
         let snapshot = SessionSnapshot {
             version: super::super::snapshot::SNAPSHOT_VERSION,
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("workspace".into()),
                 custom_name: None,
+                highlight: Some(crate::workspace::HighlightColor::Teal),
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
                 public_pane_numbers: HashMap::new(),
@@ -1183,6 +1186,7 @@ mod tests {
                 next_public_tab_number: 0,
                 tabs: vec![TabSnapshot {
                     custom_name: None,
+                    highlight: Some(crate::workspace::HighlightColor::Peach),
                     layout: LayoutSnapshot::Pane(0),
                     panes: HashMap::from([(
                         0,
@@ -1214,7 +1218,7 @@ mod tests {
         };
         let (events, _event_rx) = mpsc::channel(4);
 
-        let (_workspaces, terminals, _runtimes) = restore(
+        let (workspaces, terminals, _runtimes) = restore(
             &snapshot,
             None,
             24,
@@ -1228,6 +1232,14 @@ mod tests {
             Arc::new(RenderSignal::new()),
         );
 
+        assert_eq!(
+            workspaces[0].highlight,
+            Some(crate::workspace::HighlightColor::Teal)
+        );
+        assert_eq!(
+            workspaces[0].tabs[0].highlight,
+            Some(crate::workspace::HighlightColor::Peach)
+        );
         let terminal = terminals
             .values()
             .next()
@@ -1255,6 +1267,7 @@ mod tests {
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("w1".into()),
                 custom_name: None,
+                highlight: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
                 public_pane_numbers: HashMap::from([(10, 1), (20, 3)]),
@@ -1263,6 +1276,7 @@ mod tests {
                 next_public_tab_number: 6,
                 tabs: vec![TabSnapshot {
                     custom_name: None,
+                    highlight: None,
                     layout: LayoutSnapshot::Split {
                         direction: super::super::snapshot::DirectionSnapshot::Horizontal,
                         ratio: 0.5,
@@ -1364,6 +1378,7 @@ mod tests {
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("w1".into()),
                 custom_name: None,
+                highlight: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
                 public_pane_numbers: HashMap::from([(10, 1), (11, 2), (12, 3), (13, 4)]),
@@ -1373,6 +1388,7 @@ mod tests {
                 tabs: vec![
                     TabSnapshot {
                         custom_name: None,
+                        highlight: None,
                         layout: LayoutSnapshot::Pane(10),
                         panes: HashMap::from([pane_snap("10")]),
                         zoomed: false,
@@ -1381,6 +1397,7 @@ mod tests {
                     },
                     TabSnapshot {
                         custom_name: None,
+                        highlight: None,
                         layout: LayoutSnapshot::Pane(11),
                         panes: HashMap::from([pane_snap("11")]),
                         zoomed: false,
@@ -1389,6 +1406,7 @@ mod tests {
                     },
                     TabSnapshot {
                         custom_name: None,
+                        highlight: None,
                         layout: LayoutSnapshot::Pane(12),
                         panes: HashMap::from([pane_snap("12")]),
                         zoomed: false,
@@ -1397,6 +1415,7 @@ mod tests {
                     },
                     TabSnapshot {
                         custom_name: None,
+                        highlight: None,
                         layout: LayoutSnapshot::Pane(13),
                         panes: HashMap::from([(13, final_pane)]),
                         zoomed: false,
@@ -1447,6 +1466,7 @@ mod tests {
         let snapshot = WorkspaceSnapshot {
             id: Some("w1".into()),
             custom_name: None,
+            highlight: None,
             identity_cwd: cwd,
             worktree_space: None,
             public_pane_numbers: HashMap::new(),
@@ -1455,6 +1475,7 @@ mod tests {
             next_public_tab_number: 0,
             tabs: vec![TabSnapshot {
                 custom_name: None,
+                highlight: None,
                 layout: LayoutSnapshot::Split {
                     direction: super::super::snapshot::DirectionSnapshot::Horizontal,
                     ratio: 0.5,
@@ -1486,6 +1507,7 @@ mod tests {
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("workspace".into()),
                 custom_name: None,
+                highlight: None,
                 identity_cwd: cwd.clone(),
                 worktree_space: None,
                 public_pane_numbers: HashMap::new(),
@@ -1494,6 +1516,7 @@ mod tests {
                 next_public_tab_number: 0,
                 tabs: vec![TabSnapshot {
                     custom_name: None,
+                    highlight: None,
                     layout: LayoutSnapshot::Pane(0),
                     panes: HashMap::from([(
                         0,
@@ -1695,6 +1718,7 @@ mod tests {
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("workspace".into()),
                 custom_name: None,
+                highlight: None,
                 identity_cwd: cwd,
                 worktree_space: None,
                 public_pane_numbers: HashMap::new(),
@@ -1703,6 +1727,7 @@ mod tests {
                 next_public_tab_number: 0,
                 tabs: vec![TabSnapshot {
                     custom_name: None,
+                    highlight: None,
                     layout: LayoutSnapshot::Pane(0),
                     panes,
                     zoomed: false,

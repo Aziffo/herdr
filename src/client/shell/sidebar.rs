@@ -85,6 +85,11 @@ pub(crate) fn render_collapsed_sidebar(
             status_icon(status, config.status_indicators),
             Style::default().fg(status_color(status, palette)),
         );
+        if let Some(color) = workspace.highlight {
+            if rect.width > 0 {
+                buffer[(rect.x, rect.y)].set_fg(palette.highlight_color(color));
+            }
+        }
         hits.workspaces.push(WorkspaceHit {
             rect,
             endpoint_id: ClientEndpointId::Local,
@@ -152,6 +157,23 @@ pub(crate) fn render_collapsed_sidebar(
             status_icon(agent.agent_status, config.status_indicators),
             Style::default().fg(status_color(agent.agent_status, palette)),
         );
+        let highlight = snapshot
+            .tabs
+            .iter()
+            .find(|tab| tab.tab_id == agent.tab_id)
+            .and_then(|tab| tab.highlight)
+            .or_else(|| {
+                snapshot
+                    .workspaces
+                    .iter()
+                    .find(|workspace| workspace.workspace_id == agent.workspace_id)
+                    .and_then(|workspace| workspace.highlight)
+            });
+        if let Some(color) = highlight {
+            if rect.width > 0 {
+                buffer[(rect.x, rect.y)].set_fg(palette.highlight_color(color));
+            }
+        }
         hits.agents.push((rect, pane_id));
     }
     hits.sidebar_toggle = if area.is_empty() || workspace_area.width == 0 {
@@ -716,6 +738,13 @@ pub(in crate::client::shell) fn render_workspace_rows(
         );
     }
 
+    if let Some(color) = workspace.highlight {
+        if !area.is_empty() {
+            buffer[(area.x, area.y)]
+                .set_symbol("▍")
+                .set_fg(palette.highlight_color(color));
+        }
+    }
     let background = if selected {
         Some(palette.selection_bg)
     } else if dragged {

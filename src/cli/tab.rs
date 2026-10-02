@@ -13,6 +13,7 @@ pub(super) fn run_tab_command(args: &[String]) -> std::io::Result<i32> {
         "create" => tab_create(&args[1..]),
         "get" => tab_get(&args[1..]),
         "focus" => tab_focus(&args[1..]),
+        "highlight" => tab_highlight(&args[1..]),
         "rename" => tab_rename(&args[1..]),
         "close" => tab_close(&args[1..]),
         "help" | "--help" | "-h" => {
@@ -149,6 +150,24 @@ fn tab_focus(args: &[String]) -> std::io::Result<i32> {
     super::runtime::tab_focus(super::normalize_tab_id(raw_tab_id))
 }
 
+fn tab_highlight(args: &[String]) -> std::io::Result<i32> {
+    if args.len() != 2 {
+        eprintln!("usage: herdr tab highlight <tab_id> <color|none>");
+        return Ok(2);
+    }
+    let highlight = match crate::workspace::HighlightColor::parse_optional(Some(&args[1])) {
+        Ok(color) => color.map(|color| color.key().to_owned()),
+        Err(message) => {
+            eprintln!("{message}");
+            return Ok(2);
+        }
+    };
+    super::runtime::tab_highlight(crate::api::schema::TabHighlightParams {
+        tab_id: super::normalize_tab_id(&args[0]),
+        highlight,
+    })
+}
+
 fn tab_rename(args: &[String]) -> std::io::Result<i32> {
     if args.len() < 2 {
         eprintln!("usage: herdr tab rename <tab_id> <label>");
@@ -182,6 +201,7 @@ fn print_tab_help() {
     );
     eprintln!("  herdr tab get <tab_id>");
     eprintln!("  herdr tab focus <tab_id>");
+    eprintln!("  herdr tab highlight <tab_id> <color|none>");
     eprintln!("  herdr tab rename <tab_id> <label>");
     eprintln!("  herdr tab close <tab_id>");
 }

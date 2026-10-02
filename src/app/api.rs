@@ -1013,6 +1013,9 @@ impl App {
             Method::WorkspaceFocus(target) => {
                 return self.handle_workspace_focus(request.id, target);
             }
+            Method::WorkspaceHighlight(params) => {
+                return self.handle_workspace_highlight(request.id, params)
+            }
             Method::WorkspaceRename(params) => {
                 return self.handle_workspace_rename(request.id, params);
             }
@@ -1050,6 +1053,7 @@ impl App {
             Method::TabGet(target) => return self.handle_tab_get(request.id, target),
             Method::TabCreate(params) => return self.handle_tab_create(request.id, params),
             Method::TabFocus(target) => return self.handle_tab_focus(request.id, target),
+            Method::TabHighlight(params) => return self.handle_tab_highlight(request.id, params),
             Method::TabRename(params) => return self.handle_tab_rename(request.id, params),
             Method::TabMove(params) => return self.handle_tab_move(request.id, params),
             Method::TabClose(target) => return self.handle_tab_close(request.id, target),

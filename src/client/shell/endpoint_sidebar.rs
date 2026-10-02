@@ -166,6 +166,13 @@ pub(super) fn render_collapsed(
                     })
                     .add_modifier(dim),
             );
+            if let Some(color) = workspace.highlight {
+                if !rect.is_empty() {
+                    buffer[(rect.x, rect.y)]
+                        .set_symbol("▍")
+                        .set_fg(palette.highlight_color(color));
+                }
+            }
             hits.workspaces.push(WorkspaceHit {
                 rect,
                 endpoint_id: endpoint.endpoint_id.clone(),

@@ -4,6 +4,7 @@ use super::*;
 fn tab_overflow_controls_scroll_the_client_owned_tab_bar() {
     let mut snapshot = snapshot();
     snapshot.tabs.extend((2..=8).map(|number| ClientShellTab {
+        highlight: None,
         tab_id: format!("tab_{number}"),
         workspace_id: "ws_1".into(),
         number,
@@ -63,6 +64,7 @@ fn focused_last_overflow_tab_shows_its_full_label() {
         .iter()
         .enumerate()
         .map(|(index, label)| ClientShellTab {
+            highlight: None,
             tab_id: format!("tab_{}", index + 1),
             workspace_id: "ws_1".into(),
             number: index + 1,
@@ -150,6 +152,7 @@ fn focused_workspace_change_reveals_new_workspace_in_full_sidebar() {
     let template = initial.workspaces[0].clone();
     initial.workspaces = (1..=12)
         .map(|number| ClientShellWorkspace {
+            highlight: None,
             workspace_id: format!("ws_{number}"),
             number,
             label: format!("space-{number}"),
@@ -522,4 +525,427 @@ fn close_confirmation_error_becomes_client_owned_overlay_and_stable_group_close(
         crate::api::schema::Method::WorkspaceClose(params)
             if params.workspace_id == "ws_1" && params.close_group
     ));
+}
+
+#[test]
+fn highlight_context_menu_offers_submenu_for_tabs_and_workspaces_only() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    for tab in [true, false] {
+        if tab {
+            state.open_tab_context_menu("tab_1".into(), 0, 0);
+        } else {
+            state.open_workspace_context_menu("ws_1".into(), 0, 0);
+        }
+        let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_ref() else {
+            panic!("menu");
+        };
+        assert!(menu.items().iter().any(|item| item.label == "Highlight ▸"));
+    }
+    state.open_pane_context_menu("pane_1".into(), 0, 0);
+    let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_ref() else {
+        panic!("pane menu");
+    };
+    assert!(menu.items().iter().all(|item| item.label != "Highlight ▸"));
+}
+
+fn highlight_menu_state(
+    tab: bool,
+    color: Option<crate::workspace::HighlightColor>,
+) -> ClientShellState {
+    let mut snapshot = snapshot();
+    snapshot.tabs[0].highlight = color;
+    snapshot.workspaces[0].highlight = color;
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot));
+    state.set_pane_surface(surface());
+    state.compose(106, 20).unwrap();
+    let rect = if tab {
+        state.hits.tabs[0].0
+    } else {
+        state.hits.workspaces[0].rect
+    };
+    state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: rect.x + 1,
+        row: rect.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_mut() else {
+        panic!("menu");
+    };
+    menu.highlighted = menu
+        .items()
+        .iter()
+        .position(|item| item.has_submenu())
+        .unwrap();
+    state
+}
+
+#[test]
+fn highlight_keyboard_opens_returns_navigates_and_applies_without_changing_focus() {
+    use crate::workspace::HighlightColor;
+    for tab in [true, false] {
+        for open in [b"\x1b[C".as_slice(), b"\r".as_slice()] {
+            let mut state = highlight_menu_state(tab, Some(HighlightColor::Blue));
+            state.handle_input_bytes(open);
+            assert!(matches!(
+                state.overlay,
+                Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
+                    open_submenu: true,
+                    submenu_highlighted: 6,
+                    ..
+                }))
+            ));
+            state.handle_input_bytes(b"\x1b[D");
+            assert!(matches!(
+                state.overlay,
+                Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
+                    open_submenu: false,
+                    ..
+                }))
+            ));
+            state.handle_input_bytes(b"\x1b[C");
+            state.handle_raw_events(vec![RawInputEvent::Key(crate::input::TerminalKey::new(
+                KeyCode::Esc,
+                KeyModifiers::empty(),
+            ))]);
+            assert!(matches!(
+                state.overlay,
+                Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
+                    open_submenu: false,
+                    ..
+                }))
+            ));
+            state.handle_input_bytes(b"\r");
+            state.handle_input_bytes(b"\x1b[B");
+            state.handle_input_bytes(b"\x1b[A");
+            state.handle_input_bytes(b"\x1b[B");
+            let result = state.handle_input_bytes(b"\r");
+            assert!(state.overlay.is_none());
+            let [ClientShellAction::Endpoint { request, .. }] = &result.actions[..] else {
+                panic!("one highlight request");
+            };
+            if tab {
+                assert!(
+                    matches!(&request.method, crate::api::schema::Method::TabHighlight(params)
+                    if params.tab_id == "tab_1" && params.highlight.as_deref() == Some("mauve"))
+                );
+            } else {
+                assert!(
+                    matches!(&request.method, crate::api::schema::Method::WorkspaceHighlight(params)
+                    if params.workspace_id == "ws_1" && params.highlight.as_deref() == Some("mauve"))
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn highlight_hover_swatches_check_and_none_click_close_the_whole_menu() {
+    use crate::workspace::HighlightColor;
+    for tab in [true, false] {
+        let mut state = highlight_menu_state(tab, Some(HighlightColor::Red));
+        state.compose(106, 20).unwrap();
+        let row = *state.hits.context_menu_rows.last().unwrap();
+        state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: row.0.x,
+            row: row.0.y,
+            modifiers: KeyModifiers::empty(),
+        })]);
+        let frame = state.compose(106, 20).unwrap();
+        assert_eq!(state.hits.context_submenu_rows.len(), 9);
+        let red = state.hits.context_submenu_rows[1].0;
+        assert_eq!(
+            frame.cells[(red.y * frame.width + red.x) as usize].bg,
+            crate::protocol::color_to_u32(state.config.palette.red)
+        );
+        assert_eq!(
+            frame.cells[(red.y * frame.width + red.right() - 2) as usize].symbol,
+            "✓"
+        );
+        assert!(frame.cursor.is_none());
+        let none = state.hits.context_submenu_rows[0].0;
+        let result = state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: none.x,
+            row: none.y,
+            modifiers: KeyModifiers::empty(),
+        })]);
+        assert!(state.overlay.is_none());
+        let [ClientShellAction::Endpoint { request, .. }] = &result.actions[..] else {
+            panic!("highlight request");
+        };
+        assert!(
+            matches!(&request.method, crate::api::schema::Method::TabHighlight(params) if tab && params.highlight.is_none())
+                || matches!(&request.method, crate::api::schema::Method::WorkspaceHighlight(params) if !tab && params.highlight.is_none())
+        );
+    }
+}
+
+#[test]
+fn highlight_submenu_clamps_left_and_scrolls_in_short_terminals() {
+    let mut state = highlight_menu_state(true, None);
+    if let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_mut() {
+        menu.x = 105;
+        menu.y = 19;
+    }
+    state.handle_input_bytes(b"\x1b[C");
+    state.compose(106, 20).unwrap();
+    assert!(state.hits.context_submenu_area.right() <= state.hits.context_menu_area.x);
+    assert!(state.hits.context_submenu_area.bottom() <= 20);
+    for _ in 0..8 {
+        state.handle_input_bytes(b"\x1b[B");
+    }
+    state.compose(40, 6).unwrap();
+    assert!(state.hits.context_submenu_area.right() <= 40);
+    assert!(state.hits.context_submenu_area.bottom() <= 6);
+    assert!(state
+        .hits
+        .context_submenu_rows
+        .iter()
+        .any(|(_, index)| *index == 8));
+    let result = state.handle_input_bytes(b"\r");
+    assert!(
+        matches!(&result.actions[0], ClientShellAction::Endpoint { request, .. }
+        if matches!(&request.method, crate::api::schema::Method::TabHighlight(params) if params.highlight.as_deref() == Some("gray")))
+    );
+}
+
+#[test]
+fn highlight_outside_click_closes_and_hovering_other_parent_rows_returns() {
+    let mut state = highlight_menu_state(true, None);
+    state.handle_input_bytes(b"\x1b[C");
+    state.compose(106, 20).unwrap();
+    let row = state.hits.context_menu_rows[0].0;
+    state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Moved,
+        column: row.x,
+        row: row.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
+            open_submenu: false,
+            highlighted: 0,
+            ..
+        }))
+    ));
+    state.move_context_menu_selection(3);
+    state.handle_input_bytes(b"\x1b[C");
+    state.compose(106, 20).unwrap();
+    state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 105,
+        row: 19,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    assert!(state.overlay.is_none());
+}
+
+#[test]
+fn highlight_tabs_and_sidebar_follow_the_theme_and_clear_to_normal() {
+    use crate::workspace::HighlightColor;
+    let mut snapshot = snapshot();
+    snapshot.tabs[0].highlight = Some(HighlightColor::Peach);
+    snapshot.workspaces[0].highlight = Some(HighlightColor::Teal);
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot.clone()));
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).unwrap();
+    let tab = state.hits.tabs[0].0;
+    assert_eq!(
+        frame.cells[(tab.y * frame.width + tab.x) as usize].bg,
+        crate::protocol::color_to_u32(state.config.palette.peach)
+    );
+    let workspace = state.hits.workspaces[0].rect;
+    assert!((workspace.x..workspace.right()).any(|x| frame.cells
+        [(workspace.y * frame.width + x) as usize]
+        .symbol
+        == "▍"
+        && frame.cells[(workspace.y * frame.width + x) as usize].fg
+            == crate::protocol::color_to_u32(state.config.palette.teal)));
+    snapshot.tabs[0].highlight = None;
+    snapshot.workspaces[0].highlight = None;
+    state.set_snapshot(Box::new(snapshot));
+    let cleared = state.compose(106, 20).unwrap();
+    let tab = state.hits.tabs[0].0;
+    assert_eq!(
+        cleared.cells[(tab.y * cleared.width + tab.x) as usize].bg,
+        crate::protocol::color_to_u32(state.config.palette.accent)
+    );
+}
+
+fn highlight_agent_snapshot() -> ClientShellSnapshot {
+    let mut snapshot = snapshot();
+    snapshot.agents = vec![ClientShellAgent {
+        pane_id: "pane_1".into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some("agent".into()),
+        display_agent: None,
+        agent: None,
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: AgentStatus::Idle,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: Vec::new(),
+        focused: true,
+    }];
+    snapshot
+}
+
+#[test]
+fn highlight_agent_rows_prefer_tab_color_then_workspace_and_clear() {
+    use crate::workspace::HighlightColor;
+    let mut snapshot = highlight_agent_snapshot();
+    let config = ClientShellConfig::from_config(&Config::default());
+    for (tab_color, workspace_color, expected) in [
+        (
+            Some(HighlightColor::Blue),
+            Some(HighlightColor::Teal),
+            Some(HighlightColor::Blue),
+        ),
+        (None, Some(HighlightColor::Teal), Some(HighlightColor::Teal)),
+        (None, None, None),
+    ] {
+        snapshot.tabs[0].highlight = tab_color;
+        snapshot.workspaces[0].highlight = workspace_color;
+        let row =
+            super::super::agent_sidebar::agent_row(&snapshot, "pane_1", &config, None).unwrap();
+        assert_eq!(row.highlight, expected);
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 30, 3));
+        super::super::agent_sidebar::render_agent_row(
+            &mut buffer,
+            Rect::new(0, 0, 30, 3),
+            &row,
+            &config,
+        );
+        if let Some(color) = expected {
+            assert_eq!(buffer[(0, 0)].symbol(), "▍");
+            assert_eq!(buffer[(0, 0)].fg, config.palette.highlight_color(color));
+        } else {
+            assert_ne!(buffer[(0, 0)].symbol(), "▍");
+        }
+    }
+}
+
+#[test]
+fn highlight_closed_submenu_does_not_accept_stale_mouse_hits_in_the_same_batch() {
+    let mut state = highlight_menu_state(true, None);
+    state.handle_input_bytes(b"\x1b[C");
+    state.compose(106, 20).unwrap();
+    let swatch = state.hits.context_submenu_rows[1].0;
+    let result = state.handle_raw_events(vec![
+        RawInputEvent::Key(crate::input::TerminalKey::new(
+            KeyCode::Esc,
+            KeyModifiers::empty(),
+        )),
+        RawInputEvent::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: swatch.x,
+            row: swatch.y,
+            modifiers: KeyModifiers::empty(),
+        }),
+    ]);
+    assert!(result.actions.is_empty());
+    assert!(state.overlay.is_none());
+}
+
+#[test]
+fn highlight_right_click_on_agent_row_opens_its_tab_menu_without_focus() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(highlight_agent_snapshot()));
+    state.set_pane_surface(surface());
+    state.compose(106, 30).unwrap();
+    let row = state.hits.agents[0].0;
+    let result = state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: row.x + 1,
+        row: row.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    assert!(result.actions.is_empty());
+    let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_mut() else {
+        panic!("agent row must open its tab menu");
+    };
+    assert!(matches!(&menu.target, ClientContextMenuTarget::Tab {tab_id, ..} if tab_id == "tab_1"));
+    menu.highlighted = menu
+        .items()
+        .iter()
+        .position(|item| item.has_submenu())
+        .unwrap();
+    state.handle_input_bytes(b"\x1b[C");
+    state.handle_input_bytes(b"\x1b[B");
+    let result = state.handle_input_bytes(b"\r");
+    let [ClientShellAction::Endpoint { request, .. }] = &result.actions[..] else {
+        panic!("one tab highlight request");
+    };
+    assert!(
+        matches!(&request.method, crate::api::schema::Method::TabHighlight(params)
+        if params.tab_id == "tab_1" && params.highlight.as_deref() == Some("red"))
+    );
+}
+
+#[test]
+fn highlight_agent_menu_ignores_inactive_endpoints_with_colliding_pane_ids() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(highlight_agent_snapshot()));
+    state.set_pane_surface(surface());
+    state.compose(106, 30).unwrap();
+    let row = state.hits.agents[0].0;
+    state.hits.endpoint_agents = vec![(
+        row,
+        ClientEndpointId::Ssh(
+            crate::client::endpoint::ProfileId::parse("0123456789abcdef0123456789abcdef").unwrap(),
+        ),
+        "pane_1".into(),
+    )];
+    assert_eq!(state.active_endpoint_agent_tab_at((row.x, row.y)), None);
+    state.hits.endpoint_agents[0].1 = state.active_endpoint_id.clone();
+    assert_eq!(
+        state.active_endpoint_agent_tab_at((row.x, row.y)),
+        Some("tab_1".into())
+    );
+}
+
+#[test]
+fn highlight_collapsed_local_agent_rows_prefer_tab_then_workspace_and_clear() {
+    use crate::workspace::HighlightColor;
+    let mut snapshot = highlight_agent_snapshot();
+    let config = ClientShellConfig::from_config(&Config::default());
+    for (tab, workspace, expected) in [
+        (
+            Some(HighlightColor::Blue),
+            Some(HighlightColor::Teal),
+            Some(HighlightColor::Blue),
+        ),
+        (None, Some(HighlightColor::Teal), Some(HighlightColor::Teal)),
+        (None, None, None),
+    ] {
+        snapshot.tabs[0].highlight = tab;
+        snapshot.workspaces[0].highlight = workspace;
+        let area = Rect::new(0, 0, 4, 20);
+        let mut buffer = Buffer::empty(area);
+        let mut hits = ShellHitMap::default();
+        super::super::sidebar::render_collapsed_sidebar(
+            &mut buffer,
+            area,
+            &snapshot,
+            &config,
+            None,
+            &mut hits,
+        );
+        let rect = hits.agents[0].0;
+        assert_eq!(
+            buffer[(rect.x, rect.y)].fg,
+            expected
+                .map(|color| config.palette.highlight_color(color))
+                .unwrap_or(config.palette.text)
+        );
+    }
 }

@@ -7,6 +7,8 @@ mod worktree_overlays;
 pub(crate) struct OverlayRender {
     pub(crate) area: Rect,
     pub(crate) menu_rows: Vec<(Rect, usize)>,
+    pub(crate) submenu_area: Rect,
+    pub(crate) submenu_rows: Vec<(Rect, usize)>,
     pub(crate) primary: Rect,
     pub(crate) clear: Rect,
     pub(crate) cancel: Rect,
@@ -167,35 +169,32 @@ pub(crate) fn render_context_menu(
 ) -> Option<OverlayRender> {
     let items = menu.items();
     let screen = buffer.area;
-    let max_item_width = items
+    let width = items
         .iter()
-        .map(|item| display_width(item.label))
+        .map(|item| display_width(item.label) + if item.has_submenu() { 3 } else { 0 })
         .max()
-        .unwrap_or(0);
-    let width = max_item_width
+        .unwrap_or(0)
         .saturating_add(4)
         .max(14)
-        .min(screen.width.max(1));
-    let height = (items.len() as u16)
-        .saturating_add(2)
-        .min(screen.height.max(1));
-    let x = menu
-        .x
-        .min(screen.x.saturating_add(screen.width.saturating_sub(width)));
-    let y = menu.y.min(
-        screen
-            .y
-            .saturating_add(screen.height.saturating_sub(height)),
-    );
+        .min(screen.width);
+    let height = (items.len() as u16).saturating_add(2).min(screen.height);
+    let x = menu.x.clamp(screen.x, screen.right().saturating_sub(width));
+    let y = menu
+        .y
+        .clamp(screen.y, screen.bottom().saturating_sub(height));
     let rect = Rect::new(x, y, width, height);
     let inner = panel(buffer, rect, palette.accent, palette.panel_bg)?;
     let mut rows = Vec::new();
-    for (index, item) in items.iter().enumerate() {
-        let row_y = inner.y.saturating_add(index as u16);
-        if row_y >= inner.bottom() {
-            break;
-        }
-        let row = Rect::new(inner.x, row_y, inner.width, 1);
+    let start = menu
+        .highlighted
+        .saturating_sub(usize::from(inner.height.saturating_sub(1)));
+    for (index, item) in items
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(usize::from(inner.height))
+    {
+        let row = Rect::new(inner.x, inner.y + (index - start) as u16, inner.width, 1);
         let highlighted = index == menu.highlighted;
         let style = if highlighted {
             Style::default()
@@ -207,13 +206,95 @@ pub(crate) fn render_context_menu(
         };
         buffer.set_style(row, style);
         put_text(buffer, row.x, row.y, row.width, item.label, style);
+        if item.has_submenu() && row.width >= 3 {
+            if let Some(color) = menu.highlight {
+                put_text(
+                    buffer,
+                    row.right() - 2,
+                    row.y,
+                    2,
+                    "  ",
+                    Style::default().bg(palette.highlight_color(color)),
+                );
+            }
+        }
         rows.push((row, index));
     }
-    Some(OverlayRender {
+    let mut rendered = OverlayRender {
         area: rect,
         menu_rows: rows,
         ..OverlayRender::default()
-    })
+    };
+    if menu.open_submenu {
+        let Some(anchor) = rendered
+            .menu_rows
+            .iter()
+            .find(|(_, index)| items[*index].has_submenu())
+            .map(|(row, _)| *row)
+        else {
+            return Some(rendered);
+        };
+        let width = 17u16.min(screen.width);
+        let height = (ClientContextMenuOverlay::swatches().count() as u16)
+            .saturating_add(2)
+            .min(screen.height);
+        let x = if rect.right().saturating_add(width) <= screen.right() {
+            rect.right()
+        } else {
+            rect.x.saturating_sub(width).max(screen.x)
+        };
+        let y = anchor
+            .y
+            .saturating_sub(1)
+            .clamp(screen.y, screen.bottom().saturating_sub(height));
+        let submenu = Rect::new(x, y, width, height);
+        if let Some(inner) = panel(buffer, submenu, palette.accent, palette.panel_bg) {
+            rendered.submenu_area = submenu;
+            let start = menu
+                .submenu_highlighted
+                .saturating_sub(usize::from(inner.height.saturating_sub(1)));
+            for (index, color) in ClientContextMenuOverlay::swatches()
+                .enumerate()
+                .skip(start)
+                .take(usize::from(inner.height))
+            {
+                let row = Rect::new(inner.x, inner.y + (index - start) as u16, inner.width, 1);
+                let style = if index == menu.submenu_highlighted {
+                    Style::default()
+                        .fg(panel_contrast_fg(palette))
+                        .bg(palette.accent)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(palette.text).bg(palette.panel_bg)
+                };
+                buffer.set_style(row, style);
+                put_text(
+                    buffer,
+                    row.x,
+                    row.y,
+                    row.width.min(2),
+                    "  ",
+                    Style::default().bg(color
+                        .map(|color| palette.highlight_color(color))
+                        .unwrap_or(palette.surface0)),
+                );
+                let label = color.map(|color| color.label()).unwrap_or("None");
+                put_text(
+                    buffer,
+                    row.x.saturating_add(3),
+                    row.y,
+                    row.width.saturating_sub(5),
+                    label,
+                    style,
+                );
+                if color == menu.highlight && row.width >= 2 {
+                    put_text(buffer, row.right() - 2, row.y, 1, "✓", style);
+                }
+                rendered.submenu_rows.push((row, index));
+            }
+        }
+    }
+    Some(rendered)
 }
 
 fn panel(
@@ -1219,4 +1300,34 @@ fn render_confirm_close_overlay(
         cursor: None,
         ..OverlayRender::default()
     })
+}
+
+#[cfg(test)]
+mod highlight_tests {
+    use super::*;
+
+    #[test]
+    fn highlight_open_submenu_keeps_rendering_when_terminal_has_no_inner_rows() {
+        let mut menu = ClientContextMenuOverlay {
+            target: ClientContextMenuTarget::Tab {
+                tab_id: "tab_1".into(),
+                workspace_id: "ws_1".into(),
+            },
+            highlight: None,
+            open_submenu: true,
+            submenu_highlighted: 0,
+            x: 0,
+            y: 0,
+            highlighted: 0,
+        };
+        menu.highlighted = menu
+            .items()
+            .iter()
+            .position(|item| item.has_submenu())
+            .unwrap();
+        for height in [2, 3, 4] {
+            let mut buffer = Buffer::empty(Rect::new(0, 0, 40, height));
+            assert!(render_context_menu(&mut buffer, &menu, &Palette::catppuccin()).is_some());
+        }
+    }
 }

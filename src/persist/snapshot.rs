@@ -52,6 +52,8 @@ pub struct WorkspaceSnapshot {
     pub id: Option<String>,
     #[serde(default)]
     pub custom_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<crate::workspace::HighlightColor>,
     pub identity_cwd: PathBuf,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worktree_space: Option<crate::workspace::WorktreeSpaceMembership>,
@@ -85,6 +87,8 @@ struct LegacyWorkspaceSnapshot {
 pub struct TabSnapshot {
     #[serde(default)]
     pub custom_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<crate::workspace::HighlightColor>,
     pub layout: LayoutSnapshot,
     pub panes: HashMap<u32, PaneSnapshot>,
     pub zoomed: bool,
@@ -146,6 +150,7 @@ impl From<LegacyWorkspaceSnapshot> for WorkspaceSnapshot {
         let identity_cwd = legacy_identity_cwd(&snap);
         let tab = TabSnapshot {
             custom_name: None,
+            highlight: None,
             layout: snap.layout,
             panes: snap.panes,
             zoomed: snap.zoomed,
@@ -156,6 +161,7 @@ impl From<LegacyWorkspaceSnapshot> for WorkspaceSnapshot {
         Self {
             id: None,
             custom_name: snap.custom_name,
+            highlight: None,
             identity_cwd,
             worktree_space: None,
             public_pane_numbers: HashMap::new(),
@@ -284,6 +290,7 @@ fn capture_workspace(
     WorkspaceSnapshot {
         id: Some(ws.id.clone()),
         custom_name: ws.custom_name.clone(),
+        highlight: ws.highlight,
         identity_cwd: ws
             .resolved_identity_cwd_from(terminals, terminal_runtimes)
             .unwrap_or_else(|| ws.identity_cwd.clone()),
@@ -370,6 +377,7 @@ fn capture_tab(
     }
     TabSnapshot {
         custom_name: tab.custom_name.clone(),
+        highlight: tab.highlight,
         layout: capture_node(tab.layout.root()),
         panes,
         zoomed: tab.zoomed,
@@ -664,6 +672,7 @@ mod tests {
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("wproj".to_string()),
                 custom_name: Some("pi-mono".to_string()),
+                highlight: None,
                 identity_cwd: PathBuf::from("/home/can/Projects/herdr"),
                 worktree_space: None,
                 public_pane_numbers: HashMap::from([(0, 1), (1, 2)]),
@@ -672,6 +681,7 @@ mod tests {
                 next_public_tab_number: 2,
                 tabs: vec![TabSnapshot {
                     custom_name: Some("api".to_string()),
+                    highlight: None,
                     layout: LayoutSnapshot::Split {
                         direction: DirectionSnapshot::Horizontal,
                         ratio: 0.5,
@@ -1231,6 +1241,7 @@ mod tests {
             workspaces: vec![WorkspaceSnapshot {
                 id: Some("test-ws".to_string()),
                 custom_name: Some("fallback test".to_string()),
+                highlight: None,
                 identity_cwd: PathBuf::from("/tmp"),
                 worktree_space: None,
                 public_pane_numbers: HashMap::new(),
@@ -1239,6 +1250,7 @@ mod tests {
                 next_public_tab_number: 0,
                 tabs: vec![TabSnapshot {
                     custom_name: None,
+                    highlight: None,
                     layout: LayoutSnapshot::Split {
                         direction: DirectionSnapshot::Horizontal,
                         ratio: 0.5,
@@ -1266,5 +1278,28 @@ mod tests {
             restored.workspaces[0].tabs[0].panes[&0].cwd,
             PathBuf::from("/tmp/this-directory-does-not-exist-for-herdr-test")
         );
+    }
+
+    #[test]
+    fn highlight_snapshot_roundtrip_and_backward_compatibility() {
+        use crate::workspace::HighlightColor;
+        let mut state = state_with_workspaces(&["highlight"]);
+        state.workspaces[0].set_highlight(HighlightColor::Teal);
+        state.workspaces[0].tabs[0].set_highlight(HighlightColor::Peach);
+        let snapshot = capture_from_state(&state);
+        let json = serde_json::to_string(&snapshot).unwrap();
+        let decoded: SessionSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.workspaces[0].highlight, Some(HighlightColor::Teal));
+        assert_eq!(
+            decoded.workspaces[0].tabs[0].highlight,
+            Some(HighlightColor::Peach)
+        );
+        state.workspaces[0].clear_highlight();
+        state.workspaces[0].tabs[0].clear_highlight();
+        let json = serde_json::to_string(&capture_from_state(&state)).unwrap();
+        assert!(!json.contains("\"highlight\":"));
+        let legacy: SessionSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(legacy.workspaces[0].highlight, None);
+        assert_eq!(legacy.workspaces[0].tabs[0].highlight, None);
     }
 }

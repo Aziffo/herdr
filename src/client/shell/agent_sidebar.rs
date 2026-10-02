@@ -11,6 +11,7 @@ use ratatui::{
 use super::*;
 
 pub(super) struct AgentRow {
+    pub(super) highlight: Option<crate::workspace::HighlightColor>,
     pub(super) pane_id: String,
     pub(super) status: crate::api::schema::AgentStatus,
     pub(super) focused: bool,
@@ -311,6 +312,7 @@ pub(super) fn agent_row(
         state_text,
     );
     Some(AgentRow {
+        highlight: tab.and_then(|tab| tab.highlight).or(workspace.highlight),
         pane_id: agent.pane_id.clone(),
         status: agent.agent_status,
         focused: agent.focused,
@@ -370,6 +372,13 @@ pub(super) fn render_agent_row(
             Rect::new(rect.x, rect.y + index as u16, rect.width, 1),
             buffer,
         );
+    }
+    if let Some(color) = row.highlight {
+        if !rect.is_empty() {
+            buffer[(rect.x, rect.y)]
+                .set_symbol("▍")
+                .set_fg(palette.highlight_color(color));
+        }
     }
 }
 

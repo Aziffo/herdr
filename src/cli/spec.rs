@@ -220,6 +220,14 @@ fn workspace_command() -> Command {
                 .arg(option("seq", "N"))
                 .arg(option("ttl-ms", "N")),
         )
+        .subcommand(
+            Command::new("highlight")
+                .about("Set or clear a workspace highlight")
+                .arg(required("workspace_id", "WORKSPACE_ID"))
+                .arg(required("color", "COLOR").value_parser([
+                    "none", "red", "peach", "yellow", "green", "teal", "blue", "mauve", "gray",
+                ])),
+        )
         .subcommand(id_command("close", "workspace_id", "Close a workspace"))
 }
 
@@ -292,6 +300,14 @@ fn tab_command() -> Command {
                 .about("Rename a tab")
                 .arg(required("tab_id", "TAB_ID"))
                 .arg(required("label", "LABEL").num_args(1..)),
+        )
+        .subcommand(
+            Command::new("highlight")
+                .about("Set or clear a tab highlight")
+                .arg(required("tab_id", "TAB_ID"))
+                .arg(required("color", "COLOR").value_parser([
+                    "none", "red", "peach", "yellow", "green", "teal", "blue", "mauve", "gray",
+                ])),
         )
         .subcommand(id_command("close", "tab_id", "Close a tab"))
 }
@@ -1319,6 +1335,19 @@ mod tests {
             path.join(" ")
         );
         String::from_utf8(output).unwrap()
+    }
+
+    #[test]
+    fn highlight_commands_appear_in_help_and_completion_spec() {
+        for kind in ["tab", "workspace"] {
+            assert!(long_help(&[kind]).contains("highlight"));
+            let help = long_help(&[kind, "highlight"]);
+            for color in [
+                "none", "red", "peach", "yellow", "green", "teal", "blue", "mauve", "gray",
+            ] {
+                assert!(help.contains(color), "{kind}: {color}");
+            }
+        }
     }
 
     #[test]

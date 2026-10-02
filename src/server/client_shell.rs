@@ -51,6 +51,7 @@ pub(super) fn snapshot(
                         (tab_workspace_index == workspace_index).then_some(tab_index)
                     });
             protocol::ClientShellWorkspace {
+                highlight: state.highlight,
                 focused: focused_workspace_id.as_deref() == Some(workspace_id.as_str()),
                 workspace_id,
                 active_tab_id,
@@ -87,6 +88,7 @@ pub(super) fn snapshot(
         .map(|(tab, state)| {
             let tab_id = tab.tab_id;
             protocol::ClientShellTab {
+                highlight: state.highlight,
                 focused: focused_tab_id.as_deref() == Some(tab_id.as_str()),
                 tab_id,
                 workspace_id: tab.workspace_id,

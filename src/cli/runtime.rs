@@ -121,3 +121,18 @@ pub(super) fn pane_move(params: PaneMoveParams) -> std::io::Result<i32> {
 pub(super) fn pane_close(pane_id: String) -> std::io::Result<i32> {
     print_method_response("cli:pane:close", Method::PaneClose(PaneTarget { pane_id }))
 }
+
+pub(super) fn tab_highlight(
+    params: crate::api::schema::TabHighlightParams,
+) -> std::io::Result<i32> {
+    print_method_response("cli:tab:highlight", Method::TabHighlight(params))
+}
+
+pub(super) fn workspace_highlight(
+    params: crate::api::schema::WorkspaceHighlightParams,
+) -> std::io::Result<i32> {
+    print_method_response(
+        "cli:workspace:highlight",
+        Method::WorkspaceHighlight(params),
+    )
+}

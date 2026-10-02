@@ -25,6 +25,13 @@ pub struct TabListParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct TabHighlightParams {
+    pub tab_id: String,
+    #[serde(default)]
+    pub highlight: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TabRenameParams {
     pub tab_id: String,
     pub label: String,
@@ -38,6 +45,8 @@ pub struct TabMoveParams {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TabInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<crate::workspace::HighlightColor>,
     pub tab_id: String,
     pub workspace_id: String,
     pub number: usize,

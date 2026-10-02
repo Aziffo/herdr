@@ -100,7 +100,16 @@ pub(crate) fn render_tab_bar(
             break;
         }
         let rect = Rect::new(x, area.y, width, 1);
-        let style = if tab.focused {
+        let style = if let Some(color) = tab.highlight {
+            let base = Style::default()
+                .fg(palette.highlight_foreground(color))
+                .bg(palette.highlight_color(color));
+            if tab.focused {
+                base.add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+            } else {
+                base
+            }
+        } else if tab.focused {
             let base = Style::default()
                 .fg(panel_contrast_fg(palette))
                 .bg(palette.accent);

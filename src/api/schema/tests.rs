@@ -791,6 +791,7 @@ fn worktree_request_and_response_round_trip() {
         id: "req_worktree".into(),
         result: ResponseResult::WorktreeCreated {
             workspace: WorkspaceInfo {
+                highlight: None,
                 workspace_id: "w_1".into(),
                 number: 2,
                 label: "herdr".into(),
@@ -809,6 +810,7 @@ fn worktree_request_and_response_round_trip() {
                 }),
             },
             tab: TabInfo {
+                highlight: None,
                 tab_id: "w_1:1".into(),
                 workspace_id: "w_1".into(),
                 number: 1,
@@ -877,6 +879,7 @@ fn worktree_lifecycle_events_round_trip() {
     assert_eq!(restored, subscription);
 
     let workspace = WorkspaceInfo {
+        highlight: None,
         workspace_id: "w_2".into(),
         number: 2,
         label: "herdr".into(),
@@ -1237,6 +1240,7 @@ fn create_response_round_trips_with_root_pane() {
         id: "req_2".into(),
         result: ResponseResult::TabCreated {
             tab: TabInfo {
+                highlight: None,
                 tab_id: "w_1:2".into(),
                 workspace_id: "w_1".into(),
                 number: 2,
@@ -1455,4 +1459,42 @@ fn pane_link_resolve_round_trips() {
         serde_json::from_value::<ResponseResult>(json).unwrap(),
         result
     );
+}
+
+#[test]
+fn highlight_api_methods_and_event_subscriptions_have_stable_json_shapes() {
+    let request = Request {
+        id: "highlight".into(),
+        method: Method::TabHighlight(TabHighlightParams {
+            tab_id: "w1:t1".into(),
+            highlight: Some("teal".into()),
+        }),
+    };
+    assert_eq!(
+        serde_json::to_value(&request).unwrap(),
+        serde_json::json!({"id":"highlight", "method":"tab.highlight", "params":{"tab_id":"w1:t1", "highlight":"teal"}})
+    );
+    let request = Request {
+        id: "clear".into(),
+        method: Method::WorkspaceHighlight(WorkspaceHighlightParams {
+            workspace_id: "w1".into(),
+            highlight: None,
+        }),
+    };
+    assert_eq!(
+        serde_json::to_value(&request).unwrap(),
+        serde_json::json!({"id":"clear", "method":"workspace.highlight", "params":{"workspace_id":"w1", "highlight":null}})
+    );
+    for (subscription, name) in [
+        (Subscription::TabHighlighted {}, "tab.highlighted"),
+        (
+            Subscription::WorkspaceHighlighted {},
+            "workspace.highlighted",
+        ),
+    ] {
+        assert_eq!(
+            serde_json::to_value(subscription).unwrap(),
+            serde_json::json!({"type":name})
+        );
+    }
 }
