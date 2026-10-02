@@ -619,6 +619,10 @@ impl ClientShellState {
                 let rendered =
                     render::render_context_menu(&mut composed, menu, &self.config.palette)?;
                 occlusion.cover(rendered.area);
+                occlusion.cover(rendered.submenu_area);
+                self.hits.context_menu_area = rendered.area;
+                self.hits.context_submenu_area = rendered.submenu_area;
+                self.hits.context_submenu_rows = rendered.submenu_rows;
                 self.hits.context_menu_rows = rendered.menu_rows;
                 None
             } else if let ClientShellOverlay::GlobalMenu(menu) = overlay {

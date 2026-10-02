@@ -5,7 +5,7 @@ impl ClientContextMenuOverlay {
         use ClientContextMenuAction as Action;
 
         let item = |label, action| ClientContextMenuItem { label, action };
-        match &self.target {
+        let mut items = match &self.target {
             ClientContextMenuTarget::Workspace { is_git: false, .. } => {
                 vec![item("Rename", Action::Rename), item("Close", Action::Close)]
             }
@@ -75,6 +75,30 @@ impl ClientContextMenuOverlay {
                 ]);
                 items
             }
+        };
+        if !matches!(self.target, ClientContextMenuTarget::Pane { .. }) {
+            items.push(ClientContextMenuItem {
+                label: "Highlight ▸",
+                action: Action::OpenHighlight,
+            });
+        }
+        items
+    }
+
+    pub(super) fn swatches() -> impl Iterator<Item = Option<crate::workspace::HighlightColor>> {
+        std::iter::once(None).chain(crate::workspace::HighlightColor::ALL.into_iter().map(Some))
+    }
+
+    pub(super) fn open_highlight_submenu(&mut self) {
+        if self
+            .items()
+            .get(self.highlighted)
+            .is_some_and(|item| item.has_submenu())
+        {
+            self.open_submenu = true;
+            self.submenu_highlighted = Self::swatches()
+                .position(|color| color == self.highlight)
+                .unwrap_or(0);
         }
     }
 }
@@ -117,6 +141,9 @@ impl ClientShellState {
                 has_worktree_children,
                 collapsed,
             },
+            highlight: workspace.highlight,
+            open_submenu: false,
+            submenu_highlighted: 0,
             x,
             y,
             highlighted: 0,
@@ -136,6 +163,9 @@ impl ClientShellState {
                 tab_id,
                 workspace_id: tab.workspace_id.clone(),
             },
+            highlight: tab.highlight,
+            open_submenu: false,
+            submenu_highlighted: 0,
             x,
             y,
             highlighted: 0,
@@ -161,6 +191,9 @@ impl ClientShellState {
                 has_manual_label: pane.label.is_some(),
                 right_click_passthrough: pane.right_click_passthrough,
             },
+            highlight: None,
+            open_submenu: false,
+            submenu_highlighted: 0,
             x,
             y,
             highlighted: 0,
@@ -171,12 +204,48 @@ impl ClientShellState {
         let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.as_mut() else {
             return;
         };
-        let item_count = menu.items().len();
+        let item_count = if menu.open_submenu {
+            Self::highlight_swatch_count()
+        } else {
+            menu.items().len()
+        };
         if item_count == 0 {
             return;
         }
-        menu.highlighted = (menu.highlighted as isize + delta)
-            .clamp(0, item_count.saturating_sub(1) as isize) as usize;
+        let selected = if menu.open_submenu {
+            &mut menu.submenu_highlighted
+        } else {
+            &mut menu.highlighted
+        };
+        *selected =
+            (*selected as isize + delta).clamp(0, item_count.saturating_sub(1) as isize) as usize;
+    }
+
+    fn highlight_swatch_count() -> usize {
+        ClientContextMenuOverlay::swatches().count()
+    }
+
+    pub(super) fn open_context_submenu(&mut self) {
+        if let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.as_mut() {
+            menu.open_highlight_submenu();
+        }
+    }
+
+    pub(super) fn close_context_submenu(&mut self) -> bool {
+        if let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.as_mut() {
+            if menu.open_submenu {
+                menu.open_submenu = false;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub(super) fn activate_context_swatch(&mut self, index: usize, outcome: &mut ClientShellInput) {
+        let Some(color) = ClientContextMenuOverlay::swatches().nth(index) else {
+            return;
+        };
+        self.activate_context_menu_action(ClientContextMenuAction::SetHighlight(color), outcome);
     }
 
     pub(super) fn activate_context_menu_item(
@@ -184,11 +253,27 @@ impl ClientShellState {
         index: usize,
         outcome: &mut ClientShellInput,
     ) {
-        let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.take() else {
+        let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.as_mut() else {
             return;
         };
         let Some(action) = menu.items().get(index).map(|item| item.action) else {
+            return;
+        };
+        if action == ClientContextMenuAction::OpenHighlight {
+            menu.highlighted = index;
+            menu.open_highlight_submenu();
             outcome.repaint = true;
+            return;
+        }
+        self.activate_context_menu_action(action, outcome);
+    }
+
+    fn activate_context_menu_action(
+        &mut self,
+        action: ClientContextMenuAction,
+        outcome: &mut ClientShellInput,
+    ) {
+        let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.take() else {
             return;
         };
         match menu.target {
@@ -226,6 +311,17 @@ impl ClientShellState {
         use crate::input::KeybindAction;
 
         match action {
+            ClientContextMenuAction::SetHighlight(color) => {
+                self.push_endpoint_method(
+                    crate::api::schema::Method::WorkspaceHighlight(
+                        crate::api::schema::WorkspaceHighlightParams {
+                            workspace_id,
+                            highlight: color.map(|color| color.key().to_owned()),
+                        },
+                    ),
+                    outcome,
+                );
+            }
             ClientContextMenuAction::Rename => {
                 let label = self
                     .snapshot
@@ -297,6 +393,16 @@ impl ClientShellState {
     ) {
         use crate::api::schema::{Method, TabTarget};
 
+        if let ClientContextMenuAction::SetHighlight(color) = action {
+            self.push_endpoint_method(
+                Method::TabHighlight(crate::api::schema::TabHighlightParams {
+                    tab_id,
+                    highlight: color.map(|color| color.key().to_owned()),
+                }),
+                outcome,
+            );
+            return;
+        }
         self.push_endpoint_method(
             Method::TabFocus(TabTarget {
                 tab_id: tab_id.clone(),

@@ -115,6 +115,9 @@ pub(super) struct ShellHitMap {
     pub(super) notification_toast: Rect,
     pub(super) global_menu_rows: Vec<(Rect, usize)>,
     pub(super) context_menu_rows: Vec<(Rect, usize)>,
+    pub(super) context_menu_area: Rect,
+    pub(super) context_submenu_area: Rect,
+    pub(super) context_submenu_rows: Vec<(Rect, usize)>,
     pub(super) overlay_primary: Rect,
     pub(super) overlay_clear: Rect,
     pub(super) overlay_cancel: Rect,
@@ -509,6 +512,8 @@ pub(super) struct ClientWorktreeRemoveOverlay {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ClientContextMenuAction {
     Rename,
+    OpenHighlight,
+    SetHighlight(Option<crate::workspace::HighlightColor>),
     Close,
     NewWorktree,
     OpenWorktree,
@@ -549,6 +554,9 @@ pub(super) enum ClientContextMenuTarget {
 
 #[derive(Debug)]
 pub(super) struct ClientContextMenuOverlay {
+    pub(super) highlight: Option<crate::workspace::HighlightColor>,
+    pub(super) open_submenu: bool,
+    pub(super) submenu_highlighted: usize,
     pub(super) target: ClientContextMenuTarget,
     pub(super) x: u16,
     pub(super) y: u16,
@@ -558,6 +566,12 @@ pub(super) struct ClientContextMenuOverlay {
 pub(super) struct ClientContextMenuItem {
     pub(super) label: &'static str,
     pub(super) action: ClientContextMenuAction,
+}
+
+impl ClientContextMenuItem {
+    pub(super) fn has_submenu(&self) -> bool {
+        matches!(self.action, ClientContextMenuAction::OpenHighlight)
+    }
 }
 
 #[derive(Debug)]
