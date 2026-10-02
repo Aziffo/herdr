@@ -101,6 +101,44 @@ impl App {
         )
     }
 
+    pub(super) fn handle_workspace_highlight(
+        &mut self,
+        id: String,
+        params: crate::api::schema::WorkspaceHighlightParams,
+    ) -> String {
+        let highlight =
+            match crate::workspace::HighlightColor::parse_optional(params.highlight.as_deref()) {
+                Ok(highlight) => highlight,
+                Err(message) => return encode_error(id, "invalid_highlight", message),
+            };
+        let Some(ws_idx) = self.parse_workspace_id(&params.workspace_id) else {
+            return workspace_not_found(id, &params.workspace_id);
+        };
+        let Some(target) = self.state.workspaces.get_mut(ws_idx) else {
+            return workspace_not_found(id, &params.workspace_id);
+        };
+        if target.highlight != highlight {
+            match highlight {
+                Some(color) => target.set_highlight(color),
+                None => target.clear_highlight(),
+            }
+            self.schedule_session_save();
+            self.emit_event(EventEnvelope {
+                event: EventKind::WorkspaceHighlighted,
+                data: EventData::WorkspaceHighlighted {
+                    workspace_id: self.public_workspace_id(ws_idx),
+                    highlight,
+                },
+            });
+        }
+        encode_success(
+            id,
+            ResponseResult::WorkspaceInfo {
+                workspace: self.workspace_info(ws_idx),
+            },
+        )
+    }
+
     pub(super) fn handle_workspace_rename(
         &mut self,
         id: String,
@@ -985,5 +1023,78 @@ mod tests {
         };
         assert_eq!(workspaces[0].workspace_id, moved_id);
         assert!(event_hub.events_after(0).is_empty());
+    }
+
+    #[test]
+    fn api_workspace_highlight_validates_applies_clears_and_emits_only_changes() {
+        use crate::workspace::HighlightColor;
+        let event_hub = crate::api::EventHub::default();
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            crate::app::AppPolicy::TEST,
+            None,
+            api_rx,
+            event_hub.clone(),
+        );
+        app.state.workspaces = vec![crate::workspace::Workspace::test_new("highlight")];
+        app.state.ensure_test_terminals();
+        app.state.active = Some(0);
+        let target_id = app.public_workspace_id(0);
+        for (value, expected) in [
+            (Some("red"), Some(HighlightColor::Red)),
+            (Some("red"), Some(HighlightColor::Red)),
+            (Some("none"), None),
+            (Some("blue"), Some(HighlightColor::Blue)),
+            (None, None),
+        ] {
+            let response = app.handle_workspace_highlight(
+                "highlight".into(),
+                crate::api::schema::WorkspaceHighlightParams {
+                    workspace_id: target_id.clone(),
+                    highlight: value.map(str::to_owned),
+                },
+            );
+            let success: crate::api::schema::SuccessResponse =
+                serde_json::from_str(&response).unwrap();
+            let ResponseResult::WorkspaceInfo { workspace } = success.result else {
+                panic!("expected workspace info")
+            };
+            assert_eq!(workspace.highlight, expected);
+            assert_eq!(app.state.workspaces[0].highlight, expected);
+        }
+        let events = event_hub.events_after(0);
+        assert_eq!(events.len(), 4);
+        assert!(events
+            .iter()
+            .all(|(_, event)| event.event == EventKind::WorkspaceHighlighted));
+        assert!(matches!(
+            &events[0].1.data,
+            EventData::WorkspaceHighlighted {
+                highlight: Some(HighlightColor::Red),
+                ..
+            }
+        ));
+        let response = app.handle_workspace_highlight(
+            "bad".into(),
+            crate::api::schema::WorkspaceHighlightParams {
+                workspace_id: target_id,
+                highlight: Some("#ff0000".into()),
+            },
+        );
+        let error: crate::api::schema::ErrorResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(error.error.code, "invalid_highlight");
+        assert_eq!(app.state.workspaces[0].highlight, None);
+        assert_eq!(event_hub.events_after(0).len(), 4);
+        let response = app.handle_workspace_highlight(
+            "missing".into(),
+            crate::api::schema::WorkspaceHighlightParams {
+                workspace_id: "missing".into(),
+                highlight: Some("red".into()),
+            },
+        );
+        let error: crate::api::schema::ErrorResponse = serde_json::from_str(&response).unwrap();
+        assert_eq!(error.error.code, "workspace_not_found");
+        app.state.assert_invariants_for_test();
     }
 }

@@ -40,11 +40,13 @@ const CLIENT_SHELL_METHODS: &[&str] = &[
     "tab.close",
     "tab.create",
     "tab.focus",
+    "tab.highlight",
     "tab.move",
     "tab.rename",
     "workspace.close",
     "workspace.create",
     "workspace.focus",
+    "workspace.highlight",
     "workspace.move",
     "workspace.move_block",
     "workspace.rename",
@@ -292,6 +294,9 @@ mod tests {
             actual.remove("pane.link.resolve").as_deref(),
             Some("f5e4a3e01453ae7b188f127ce951c12c20e0bebcc17cc364eeb6d1a01fd5bf81")
         );
+
+        assert!(actual.remove("tab.highlight").is_some());
+        assert!(actual.remove("workspace.highlight").is_some());
 
         assert_eq!(
             actual, expected,

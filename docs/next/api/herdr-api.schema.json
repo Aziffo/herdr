@@ -157,6 +157,32 @@
             },
             {
               "properties": {
+                "highlight": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/schemas/event/$defs/HighlightColor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": {
+                  "const": "workspace_highlighted",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
                 "label": {
                   "type": "string"
                 },
@@ -353,6 +379,36 @@
                 },
                 "type": {
                   "const": "tab_closed",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "tab_id",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "highlight": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/schemas/event/$defs/HighlightColor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tab_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "tab_highlighted",
                   "type": "string"
                 },
                 "workspace_id": {
@@ -733,6 +789,7 @@
             "workspace_metadata_updated",
             "workspace_closed",
             "workspace_renamed",
+            "workspace_highlighted",
             "workspace_moved",
             "workspace_reordered",
             "workspace_focused",
@@ -742,6 +799,7 @@
             "tab_created",
             "tab_closed",
             "tab_renamed",
+            "tab_highlighted",
             "tab_moved",
             "tab_focused",
             "pane_created",
@@ -754,6 +812,20 @@
             "pane_agent_detected",
             "pane_agent_status_changed",
             "layout_updated"
+          ],
+          "type": "string"
+        },
+        "HighlightColor": {
+          "description": "Fixed, theme-independent session highlight selection.",
+          "enum": [
+            "red",
+            "peach",
+            "yellow",
+            "green",
+            "teal",
+            "blue",
+            "mauve",
+            "gray"
           ],
           "type": "string"
         },
@@ -1037,6 +1109,16 @@
             "focused": {
               "type": "boolean"
             },
+            "highlight": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/event/$defs/HighlightColor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "label": {
               "type": "string"
             },
@@ -1078,6 +1160,16 @@
             },
             "focused": {
               "type": "boolean"
+            },
+            "highlight": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/event/$defs/HighlightColor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "label": {
               "type": "string"
@@ -4019,6 +4111,18 @@
             {
               "properties": {
                 "type": {
+                  "const": "workspace.highlighted",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "type": {
                   "const": "workspace.moved",
                   "type": "string"
                 }
@@ -4140,6 +4244,18 @@
               "properties": {
                 "type": {
                   "const": "tab.renamed",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "tab.highlighted",
                   "type": "string"
                 }
               },
@@ -4369,6 +4485,24 @@
           },
           "type": "object"
         },
+        "TabHighlightParams": {
+          "properties": {
+            "highlight": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tab_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tab_id"
+          ],
+          "type": "object"
+        },
         "TabListParams": {
           "properties": {
             "workspace_id": {
@@ -4478,6 +4612,24 @@
               ]
             }
           },
+          "type": "object"
+        },
+        "WorkspaceHighlightParams": {
+          "properties": {
+            "highlight": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id"
+          ],
           "type": "object"
         },
         "WorkspaceMoveBlockParams": {
@@ -5054,6 +5206,22 @@
         {
           "properties": {
             "method": {
+              "const": "workspace.highlight",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/WorkspaceHighlightParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
               "const": "workspace.move",
               "type": "string"
             },
@@ -5251,6 +5419,22 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/TabRenameParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "tab.highlight",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/TabHighlightParams"
             }
           },
           "required": [
@@ -6943,6 +7127,32 @@
             },
             {
               "properties": {
+                "highlight": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/schemas/success_response/$defs/HighlightColor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": {
+                  "const": "workspace_highlighted",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
                 "label": {
                   "type": "string"
                 },
@@ -7139,6 +7349,36 @@
                 },
                 "type": {
                   "const": "tab_closed",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "tab_id",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "highlight": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/schemas/success_response/$defs/HighlightColor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tab_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "tab_highlighted",
                   "type": "string"
                 },
                 "workspace_id": {
@@ -7534,6 +7774,7 @@
             "workspace_metadata_updated",
             "workspace_closed",
             "workspace_renamed",
+            "workspace_highlighted",
             "workspace_moved",
             "workspace_reordered",
             "workspace_focused",
@@ -7543,6 +7784,7 @@
             "tab_created",
             "tab_closed",
             "tab_renamed",
+            "tab_highlighted",
             "tab_moved",
             "tab_focused",
             "pane_created",
@@ -7555,6 +7797,20 @@
             "pane_agent_detected",
             "pane_agent_status_changed",
             "layout_updated"
+          ],
+          "type": "string"
+        },
+        "HighlightColor": {
+          "description": "Fixed, theme-independent session highlight selection.",
+          "enum": [
+            "red",
+            "peach",
+            "yellow",
+            "green",
+            "teal",
+            "blue",
+            "mauve",
+            "gray"
           ],
           "type": "string"
         },
@@ -10706,6 +10962,16 @@
             "focused": {
               "type": "boolean"
             },
+            "highlight": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/HighlightColor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "label": {
               "type": "string"
             },
@@ -10747,6 +11013,16 @@
             },
             "focused": {
               "type": "boolean"
+            },
+            "highlight": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/HighlightColor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "label": {
               "type": "string"

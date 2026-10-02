@@ -83,6 +83,8 @@ pub enum Method {
     WorkspaceFocus(WorkspaceTarget),
     #[serde(rename = "workspace.rename")]
     WorkspaceRename(WorkspaceRenameParams),
+    #[serde(rename = "workspace.highlight")]
+    WorkspaceHighlight(WorkspaceHighlightParams),
     #[serde(rename = "workspace.move")]
     WorkspaceMove(WorkspaceMoveParams),
     #[serde(rename = "workspace.move_block")]
@@ -109,6 +111,8 @@ pub enum Method {
     TabFocus(TabTarget),
     #[serde(rename = "tab.rename")]
     TabRename(TabRenameParams),
+    #[serde(rename = "tab.highlight")]
+    TabHighlight(TabHighlightParams),
     #[serde(rename = "tab.move")]
     TabMove(TabMoveParams),
     #[serde(rename = "tab.close")]

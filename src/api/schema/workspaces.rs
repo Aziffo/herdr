@@ -27,6 +27,13 @@ pub struct WorkspaceCloseParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct WorkspaceHighlightParams {
+    pub workspace_id: String,
+    #[serde(default)]
+    pub highlight: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct WorkspaceRenameParams {
     pub workspace_id: String,
     pub label: String,
@@ -60,6 +67,8 @@ pub struct WorkspaceReportMetadataParams {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct WorkspaceInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<crate::workspace::HighlightColor>,
     pub workspace_id: String,
     pub number: usize,
     pub label: String,

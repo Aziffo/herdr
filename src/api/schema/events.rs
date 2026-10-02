@@ -24,6 +24,8 @@ pub enum Subscription {
     WorkspaceMetadataUpdated {},
     #[serde(rename = "workspace.renamed")]
     WorkspaceRenamed {},
+    #[serde(rename = "workspace.highlighted")]
+    WorkspaceHighlighted {},
     #[serde(rename = "workspace.moved")]
     WorkspaceMoved {},
     #[serde(rename = "workspace.reordered")]
@@ -46,6 +48,8 @@ pub enum Subscription {
     TabFocused {},
     #[serde(rename = "tab.renamed")]
     TabRenamed {},
+    #[serde(rename = "tab.highlighted")]
+    TabHighlighted {},
     #[serde(rename = "tab.moved")]
     TabMoved {},
     #[serde(rename = "pane.created")]
@@ -197,6 +201,7 @@ pub enum EventKind {
     WorkspaceMetadataUpdated,
     WorkspaceClosed,
     WorkspaceRenamed,
+    WorkspaceHighlighted,
     WorkspaceMoved,
     WorkspaceReordered,
     WorkspaceFocused,
@@ -206,6 +211,7 @@ pub enum EventKind {
     TabCreated,
     TabClosed,
     TabRenamed,
+    TabHighlighted,
     TabMoved,
     TabFocused,
     PaneCreated,
@@ -228,6 +234,7 @@ impl EventKind {
             EventKind::WorkspaceMetadataUpdated => "workspace.metadata_updated",
             EventKind::WorkspaceClosed => "workspace.closed",
             EventKind::WorkspaceRenamed => "workspace.renamed",
+            EventKind::WorkspaceHighlighted => "workspace.highlighted",
             EventKind::WorkspaceMoved => "workspace.moved",
             EventKind::WorkspaceReordered => "workspace.reordered",
             EventKind::WorkspaceFocused => "workspace.focused",
@@ -237,6 +244,7 @@ impl EventKind {
             EventKind::TabCreated => "tab.created",
             EventKind::TabClosed => "tab.closed",
             EventKind::TabRenamed => "tab.renamed",
+            EventKind::TabHighlighted => "tab.highlighted",
             EventKind::TabMoved => "tab.moved",
             EventKind::TabFocused => "tab.focused",
             EventKind::PaneCreated => "pane.created",
@@ -260,6 +268,7 @@ pub const KNOWN_EVENT_KINDS: &[EventKind] = &[
     EventKind::WorkspaceMetadataUpdated,
     EventKind::WorkspaceClosed,
     EventKind::WorkspaceRenamed,
+    EventKind::WorkspaceHighlighted,
     EventKind::WorkspaceMoved,
     EventKind::WorkspaceReordered,
     EventKind::WorkspaceFocused,
@@ -269,6 +278,7 @@ pub const KNOWN_EVENT_KINDS: &[EventKind] = &[
     EventKind::TabCreated,
     EventKind::TabClosed,
     EventKind::TabRenamed,
+    EventKind::TabHighlighted,
     EventKind::TabMoved,
     EventKind::TabFocused,
     EventKind::PaneCreated,
@@ -288,6 +298,7 @@ pub const PLUGIN_HOOK_EVENT_KINDS: &[EventKind] = &[
     EventKind::WorkspaceUpdated,
     EventKind::WorkspaceClosed,
     EventKind::WorkspaceRenamed,
+    EventKind::WorkspaceHighlighted,
     EventKind::WorkspaceMoved,
     EventKind::WorkspaceReordered,
     EventKind::WorkspaceFocused,
@@ -297,6 +308,7 @@ pub const PLUGIN_HOOK_EVENT_KINDS: &[EventKind] = &[
     EventKind::TabCreated,
     EventKind::TabClosed,
     EventKind::TabRenamed,
+    EventKind::TabHighlighted,
     EventKind::TabMoved,
     EventKind::TabFocused,
     EventKind::PaneCreated,
@@ -434,6 +446,10 @@ pub enum EventData {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         workspace: Option<WorkspaceInfo>,
     },
+    WorkspaceHighlighted {
+        workspace_id: String,
+        highlight: Option<crate::workspace::HighlightColor>,
+    },
     WorkspaceRenamed {
         workspace_id: String,
         label: String,
@@ -474,6 +490,11 @@ pub enum EventData {
     TabClosed {
         tab_id: String,
         workspace_id: String,
+    },
+    TabHighlighted {
+        tab_id: String,
+        workspace_id: String,
+        highlight: Option<crate::workspace::HighlightColor>,
     },
     TabRenamed {
         tab_id: String,
