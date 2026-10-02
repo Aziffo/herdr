@@ -100,13 +100,19 @@ impl Palette {
                     }
                 };
                 let luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
-                if luminance > 0.179 {
+                // Equal black/white contrast occurs at sqrt(0.05 * 1.05) - 0.05.
+                const BLACK_WHITE_CROSSOVER: f64 = 0.179;
+                if luminance > BLACK_WHITE_CROSSOVER {
                     Color::Black
                 } else {
                     Color::White
                 }
             }
-            Color::Yellow
+            // Named colors use the conventional xterm palette as an approximation;
+            // a terminal can override these RGB values.
+            Color::Green
+            | Color::Cyan
+            | Color::Yellow
             | Color::Gray
             | Color::DarkGray
             | Color::LightRed
@@ -115,14 +121,11 @@ impl Palette {
             | Color::LightMagenta
             | Color::LightCyan
             | Color::White => Color::Black,
-            Color::Black
-            | Color::Red
-            | Color::Green
-            | Color::Blue
-            | Color::Magenta
-            | Color::Cyan
-            | Color::LightBlue => Color::White,
-            _ => self.text,
+            Color::Black | Color::Red | Color::Blue | Color::Magenta | Color::LightBlue => {
+                Color::White
+            }
+            // Reset and indexed colors have no known RGB value in the active terminal.
+            Color::Reset | Color::Indexed(_) => self.text,
         }
     }
 
@@ -1442,6 +1445,15 @@ mod tests {
         );
         assert_eq!(
             terminal.highlight_foreground(HighlightColor::Blue),
+            Color::White
+        );
+        for color in [HighlightColor::Green, HighlightColor::Teal] {
+            assert_eq!(terminal.highlight_foreground(color), Color::Black);
+        }
+        let mut custom = terminal.clone();
+        custom.green = Color::LightBlue;
+        assert_eq!(
+            custom.highlight_foreground(HighlightColor::Green),
             Color::White
         );
         for name in crate::config::THEME_NAMES {

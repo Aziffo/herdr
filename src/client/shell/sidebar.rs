@@ -157,6 +157,23 @@ pub(crate) fn render_collapsed_sidebar(
             status_icon(agent.agent_status, config.status_indicators),
             Style::default().fg(status_color(agent.agent_status, palette)),
         );
+        let highlight = snapshot
+            .tabs
+            .iter()
+            .find(|tab| tab.tab_id == agent.tab_id)
+            .and_then(|tab| tab.highlight)
+            .or_else(|| {
+                snapshot
+                    .workspaces
+                    .iter()
+                    .find(|workspace| workspace.workspace_id == agent.workspace_id)
+                    .and_then(|workspace| workspace.highlight)
+            });
+        if let Some(color) = highlight {
+            if rect.width > 0 {
+                buffer[(rect.x, rect.y)].set_fg(palette.highlight_color(color));
+            }
+        }
         hits.agents.push((rect, pane_id));
     }
     hits.sidebar_toggle = if area.is_empty() || workspace_area.width == 0 {

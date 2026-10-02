@@ -29,7 +29,7 @@ struct ClientShellTabJson {
     focused: bool,
     #[serde(deserialize_with = "deserialize_client_shell_agent_status")]
     agent_status: crate::api::schema::AgentStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     highlight: Option<crate::workspace::HighlightColor>,
 }
 
@@ -118,7 +118,7 @@ struct ClientShellWorkspaceJson {
     focused: bool,
     #[serde(deserialize_with = "deserialize_client_shell_agent_status")]
     agent_status: crate::api::schema::AgentStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     highlight: Option<crate::workspace::HighlightColor>,
 }
 
@@ -198,6 +198,12 @@ mod tests {
         let mut tab: ClientShellTab = serde_json::from_value(json.clone()).unwrap();
         assert_eq!(tab.highlight, None);
         let baseline = bincode::serde::encode_to_vec(&tab, bincode::config::standard()).unwrap();
+        // Literal generation-1 bytes freeze the original field order independently of this serializer.
+        assert_eq!(
+            baseline,
+            vec![5, 119, 49, 58, 116, 49, 2, 119, 49, 1, 5, 115, 104, 101, 108, 108, 0, 0, 1, 0],
+            "frozen generation-1 tab bytes"
+        );
         tab.highlight = Some(HighlightColor::Mauve);
         let encoded = bincode::serde::encode_to_vec(&tab, bincode::config::standard()).unwrap();
         assert_eq!(encoded, baseline);
@@ -216,6 +222,14 @@ mod tests {
         assert_eq!(workspace.highlight, None);
         let baseline =
             bincode::serde::encode_to_vec(&workspace, bincode::config::standard()).unwrap();
+        assert_eq!(
+            baseline,
+            vec![
+                2, 119, 49, 5, 119, 49, 58, 116, 49, 4, 47, 116, 109, 112, 1, 9, 119, 111, 114,
+                107, 115, 112, 97, 99, 101, 0, 0, 0, 0, 0, 1, 0
+            ],
+            "frozen generation-1 workspace bytes"
+        );
         workspace.highlight = Some(HighlightColor::Gray);
         assert_eq!(
             bincode::serde::encode_to_vec(&workspace, bincode::config::standard()).unwrap(),

@@ -912,3 +912,40 @@ fn highlight_agent_menu_ignores_inactive_endpoints_with_colliding_pane_ids() {
         Some("tab_1".into())
     );
 }
+
+#[test]
+fn highlight_collapsed_local_agent_rows_prefer_tab_then_workspace_and_clear() {
+    use crate::workspace::HighlightColor;
+    let mut snapshot = highlight_agent_snapshot();
+    let config = ClientShellConfig::from_config(&Config::default());
+    for (tab, workspace, expected) in [
+        (
+            Some(HighlightColor::Blue),
+            Some(HighlightColor::Teal),
+            Some(HighlightColor::Blue),
+        ),
+        (None, Some(HighlightColor::Teal), Some(HighlightColor::Teal)),
+        (None, None, None),
+    ] {
+        snapshot.tabs[0].highlight = tab;
+        snapshot.workspaces[0].highlight = workspace;
+        let area = Rect::new(0, 0, 4, 20);
+        let mut buffer = Buffer::empty(area);
+        let mut hits = ShellHitMap::default();
+        super::super::sidebar::render_collapsed_sidebar(
+            &mut buffer,
+            area,
+            &snapshot,
+            &config,
+            None,
+            &mut hits,
+        );
+        let rect = hits.agents[0].0;
+        assert_eq!(
+            buffer[(rect.x, rect.y)].fg,
+            expected
+                .map(|color| config.palette.highlight_color(color))
+                .unwrap_or(config.palette.text)
+        );
+    }
+}

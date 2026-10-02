@@ -226,11 +226,14 @@ pub(crate) fn render_context_menu(
         ..OverlayRender::default()
     };
     if menu.open_submenu {
-        let anchor = rendered
+        let Some(anchor) = rendered
             .menu_rows
             .iter()
             .find(|(_, index)| items[*index].has_submenu())
-            .map(|(row, _)| *row)?;
+            .map(|(row, _)| *row)
+        else {
+            return Some(rendered);
+        };
         let width = 17u16.min(screen.width);
         let height = (ClientContextMenuOverlay::swatches().count() as u16)
             .saturating_add(2)
@@ -1297,4 +1300,34 @@ fn render_confirm_close_overlay(
         cursor: None,
         ..OverlayRender::default()
     })
+}
+
+#[cfg(test)]
+mod highlight_tests {
+    use super::*;
+
+    #[test]
+    fn highlight_open_submenu_keeps_rendering_when_terminal_has_no_inner_rows() {
+        let mut menu = ClientContextMenuOverlay {
+            target: ClientContextMenuTarget::Tab {
+                tab_id: "tab_1".into(),
+                workspace_id: "ws_1".into(),
+            },
+            highlight: None,
+            open_submenu: true,
+            submenu_highlighted: 0,
+            x: 0,
+            y: 0,
+            highlighted: 0,
+        };
+        menu.highlighted = menu
+            .items()
+            .iter()
+            .position(|item| item.has_submenu())
+            .unwrap();
+        for height in [2, 3, 4] {
+            let mut buffer = Buffer::empty(Rect::new(0, 0, 40, height));
+            assert!(render_context_menu(&mut buffer, &menu, &Palette::catppuccin()).is_some());
+        }
+    }
 }
