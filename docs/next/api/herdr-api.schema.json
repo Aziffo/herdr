@@ -2598,6 +2598,24 @@
           ],
           "type": "object"
         },
+        "PaneHighlightParams": {
+          "properties": {
+            "color": {
+              "description": "Lowercase palette color; null clears the highlight.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "pane_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pane_id"
+          ],
+          "type": "object"
+        },
         "PaneInputSetParams": {
           "properties": {
             "pane_id": {
@@ -5857,6 +5875,22 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/PaneRenameParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "pane.highlight",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/PaneHighlightParams"
             }
           },
           "required": [

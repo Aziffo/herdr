@@ -141,6 +141,8 @@ pub struct TerminalState {
     reported_resume_revision: u64,
     pub terminal_title: Option<String>,
     pub manual_label: Option<String>,
+    /// None inherits legacy plugin metadata; empty string is an explicit clear.
+    pub native_highlight: Option<String>,
     pub agent_name: Option<String>,
     agent_name_owner: Option<AgentNameOwner>,
     managed_agent: Option<ManagedAgent>,
@@ -181,6 +183,7 @@ impl TerminalState {
             reported_resume_revision: 0,
             terminal_title: None,
             manual_label: None,
+            native_highlight: None,
             agent_name: None,
             agent_name_owner: None,
             managed_agent: None,
@@ -2096,6 +2099,18 @@ impl TerminalState {
                     &authority.agent_label,
                 )
         })
+    }
+
+    pub(crate) fn display_tokens(&self) -> HashMap<String, String> {
+        let mut tokens = self.metadata_tokens.values();
+        if let Some(color) = &self.native_highlight {
+            if color.is_empty() {
+                tokens.remove("highlight_pane");
+            } else {
+                tokens.insert("highlight_pane".into(), color.clone());
+            }
+        }
+        tokens
     }
 
     pub fn set_manual_label(&mut self, label: String) {

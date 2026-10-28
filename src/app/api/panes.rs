@@ -1483,6 +1483,37 @@ impl App {
         encode_success(id, ResponseResult::Ok {})
     }
 
+    pub(super) fn handle_pane_highlight(
+        &mut self,
+        id: String,
+        params: crate::api::schema::PaneHighlightParams,
+    ) -> String {
+        let color = match params.color.as_deref() {
+            None => "",
+            Some("red") => "Red",
+            Some("peach") => "Peach",
+            Some("yellow") => "Yellow",
+            Some("green") => "Green",
+            Some("teal") => "Teal",
+            Some("blue") => "Blue",
+            Some("mauve") => "Mauve",
+            Some("gray") => "Gray",
+            _ => return encode_error(id, "invalid_highlight_color", "unknown highlight color"),
+        };
+        let Some((ws_idx, pane_id)) = self.parse_pane_id(&params.pane_id) else {
+            return pane_not_found(id, &params.pane_id);
+        };
+        let Some(terminal_id) = self.state.workspaces[ws_idx].terminal_id(pane_id).cloned() else {
+            return pane_not_found(id, &params.pane_id);
+        };
+        let Some(terminal) = self.state.terminals.get_mut(&terminal_id) else {
+            return pane_not_found(id, &params.pane_id);
+        };
+        terminal.native_highlight = Some(color.into());
+        self.state.mark_session_dirty();
+        encode_success(id, ResponseResult::Ok {})
+    }
+
     pub(super) fn handle_pane_rename(&mut self, id: String, params: PaneRenameParams) -> String {
         let Some((ws_idx, pane_id)) = self.parse_pane_id(&params.pane_id) else {
             return pane_not_found(id, &params.pane_id);
@@ -4389,6 +4420,72 @@ mod tests {
         assert_eq!(focus.source_pane_id, root_public.clone());
         assert_eq!(focus.focused_pane_id, Some(root_public));
         assert_eq!(app.state.workspaces[0].focused_pane_id(), Some(root));
+    }
+
+    #[test]
+    fn native_highlight_is_immediate_isolated_and_survives_stale_plugin_projection() {
+        let (mut app, public_id) = app_with_test_workspace();
+        let root = app.state.workspaces[0].tabs[0].root_pane;
+        let sibling = app.state.workspaces[0].test_split(ratatui::layout::Direction::Horizontal);
+        app.state.ensure_test_terminals();
+        let focused = app.state.workspaces[0].focused_pane_id();
+        for color in [Some("green"), None, Some("blue")] {
+            let response = app.handle_api_request(crate::api::schema::Request {
+                id: "highlight".into(),
+                method: crate::api::schema::Method::PaneHighlight(
+                    crate::api::schema::PaneHighlightParams {
+                        pane_id: public_id.clone(),
+                        color: color.map(str::to_string),
+                    },
+                ),
+            });
+            let response: SuccessResponse = serde_json::from_str(&response).unwrap();
+            assert_eq!(response.result, ResponseResult::Ok {});
+            assert!(app.state.session_dirty);
+            let mut stale = metadata_params(public_id.clone());
+            stale.source = "aziffo.highlight".into();
+            stale
+                .tokens
+                .insert("highlight_pane".into(), Some("Red".into()));
+            let response = app.handle_pane_report_metadata("stale".into(), stale);
+            let response: SuccessResponse = serde_json::from_str(&response).unwrap();
+            assert_eq!(response.result, ResponseResult::Ok {});
+            let expected = color.map(|c| if c == "green" { "Green" } else { "Blue" });
+            assert_eq!(
+                app.pane_info(0, root)
+                    .unwrap()
+                    .tokens
+                    .get("highlight_pane")
+                    .map(String::as_str),
+                expected
+            );
+            assert!(!app
+                .pane_info(0, sibling)
+                .unwrap()
+                .tokens
+                .contains_key("highlight_pane"));
+            assert_eq!(app.state.workspaces[0].focused_pane_id(), focused);
+            let snapshot = crate::persist::capture(
+                &app.state.workspaces,
+                &app.state.terminals,
+                &app.terminal_runtimes,
+                app.state.active,
+                app.state.selected,
+            );
+            let saved = &snapshot.workspaces[0].tabs[0].panes[&root.raw()];
+            assert_eq!(
+                saved.native_highlight.as_deref(),
+                Some(expected.unwrap_or(""))
+            );
+        }
+        let invalid = app.handle_pane_highlight(
+            "invalid".into(),
+            crate::api::schema::PaneHighlightParams {
+                pane_id: public_id,
+                color: Some("purple".into()),
+            },
+        );
+        assert!(invalid.contains("invalid_highlight_color"));
     }
 
     #[test]

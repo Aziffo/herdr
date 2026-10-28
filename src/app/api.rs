@@ -1185,6 +1185,7 @@ impl App {
                 return self.handle_pane_link_activate(request.id, params);
             }
             Method::PaneRename(params) => return self.handle_pane_rename(request.id, params),
+            Method::PaneHighlight(params) => return self.handle_pane_highlight(request.id, params),
             Method::PaneRead(params) => return self.handle_pane_read(request.id, params),
             Method::PaneReportAgent(params) => {
                 return self.handle_pane_report_agent(request.id, params);

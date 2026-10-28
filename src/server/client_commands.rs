@@ -25,6 +25,7 @@ const CLIENT_SHELL_METHODS: &[&str] = &[
     "pane.edit_scrollback",
     "pane.focus",
     "pane.focus_direction",
+    "pane.highlight",
     "pane.input.set",
     "pane.link.activate",
     "pane.link.resolve",
@@ -289,6 +290,10 @@ mod tests {
         )))
         .expect("endpoint method shape fixture");
         let mut actual = endpoint_method_shape_digests();
+        assert_eq!(
+            actual.remove("pane.highlight").as_deref(),
+            Some("d58517ce32c4f42af8a8bc2107a87810749e6b336cb6793e8cc161be87e25e05")
+        );
         // Freeze additive methods separately without rewriting the published fixture.
         assert_eq!(
             actual.remove("plugin.action.invoke").as_deref(),

@@ -316,6 +316,13 @@ pub struct PaneCurrentParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PaneHighlightParams {
+    pub pane_id: String,
+    /// Lowercase palette color; null clears the highlight.
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PaneRenameParams {
     pub pane_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

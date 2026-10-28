@@ -82,7 +82,19 @@ impl ClientShellState {
         color: Option<HighlightColor>,
         outcome: &mut ClientShellInput,
     ) {
-        use crate::api::schema::{Method, PluginActionInvokeParams, PluginInvocationContext};
+        use crate::api::schema::{
+            Method, PaneHighlightParams, PluginActionInvokeParams, PluginInvocationContext,
+        };
+        if let ClientContextMenuTarget::Pane { pane_id, .. } = &target {
+            self.push_endpoint_method(
+                Method::PaneHighlight(PaneHighlightParams {
+                    pane_id: pane_id.clone(),
+                    color: color.map(|color| color.key().to_string()),
+                }),
+                outcome,
+            );
+            return;
+        }
         let (kind, workspace_id, tab_id, focused_pane_id) = match target {
             ClientContextMenuTarget::Workspace { workspace_id, .. } => {
                 ("workspace", workspace_id, None, None)

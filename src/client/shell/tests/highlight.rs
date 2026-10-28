@@ -68,15 +68,12 @@ fn assert_choice(result: &ClientShellInput, expected: &str) {
     let [ClientShellAction::Endpoint { request, .. }] = &result.actions[..] else {
         panic!("one targeted action")
     };
-    let crate::api::schema::Method::PluginActionInvoke(params) = &request.method else {
-        panic!("plugin action")
+    let crate::api::schema::Method::PaneHighlight(params) = &request.method else {
+        panic!("native highlight action")
     };
-    assert_eq!(params.plugin_id.as_deref(), Some("aziffo.highlight"));
-    assert_eq!(params.action_id, expected);
-    let context = params.context.as_ref().unwrap();
-    assert_eq!(context.focused_pane_id.as_deref(), Some("pane_2"));
-    assert_eq!(context.workspace_id.as_deref(), Some("ws_1"));
-    assert_eq!(context.tab_id.as_deref(), Some("tab_1"));
+    assert_eq!(params.pane_id, "pane_2");
+    let color = expected.strip_prefix("pane-").unwrap();
+    assert_eq!(params.color.as_deref(), (color != "clear").then_some(color));
 }
 
 #[test]

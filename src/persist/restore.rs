@@ -450,6 +450,7 @@ fn unavailable_restored_terminal(
     terminal.restore_error = Some(reason);
     if let Some(pane) = pane {
         terminal.manual_label = pane.label.clone();
+        terminal.native_highlight = pane.native_highlight.clone();
         terminal.launch_argv = pane.launch_argv.clone();
         if let Some(session) = restored_terminal_agent_session(pane.agent_session.as_ref(), false) {
             terminal.set_persisted_agent_session(session);
@@ -538,6 +539,7 @@ fn restore_tab(
             .and_then(|pane| pane.managed_agent_kind.as_deref())
             .and_then(crate::detect::parse_canonical_agent_label);
         let saved_launch_argv = saved_pane.and_then(|p| p.launch_argv.clone());
+        let saved_highlight = saved_pane.and_then(|p| p.native_highlight.clone());
         let saved_agent_session = saved_pane.and_then(|p| p.agent_session.as_ref());
         let saved_agent_resume = saved_pane.and_then(saved_reported_resume);
         let saved_history =
@@ -593,6 +595,7 @@ fn restore_tab(
             let terminal_id = TerminalId::alloc();
             let mut terminal = TerminalState::new(terminal_id.clone(), cwd.clone())
                 .with_pending_agent_resume_plan(plan);
+            terminal.native_highlight = saved_highlight.clone();
             if let Some(label) = saved_label {
                 terminal.set_manual_label(label);
             }
@@ -693,6 +696,7 @@ fn restore_tab(
                         terminal = terminal.with_launch_argv(argv).with_respawn_shell_on_exit();
                     }
                 }
+                terminal.native_highlight = saved_highlight.clone();
                 if let Some(label) = saved_label {
                     terminal.set_manual_label(label);
                 }
@@ -1542,6 +1546,7 @@ mod tests {
                     panes: HashMap::from([(
                         0,
                         super::super::snapshot::PaneSnapshot {
+                            native_highlight: Some("Green".into()),
                             cwd,
                             label: Some("reviewer".into()),
                             agent_name: Some("reviewer".into()),
@@ -1594,6 +1599,7 @@ mod tests {
         );
         assert_eq!(terminal.agent_name, None);
         assert_eq!(terminal.manual_label.as_deref(), Some("reviewer"));
+        assert_eq!(terminal.native_highlight.as_deref(), Some("Green"));
         let session = terminal
             .persisted_agent_session
             .as_ref()
@@ -1629,6 +1635,7 @@ mod tests {
                         (
                             10,
                             super::super::snapshot::PaneSnapshot {
+                                native_highlight: None,
                                 cwd: cwd.clone(),
                                 label: None,
                                 agent_name: None,
@@ -1641,6 +1648,7 @@ mod tests {
                         (
                             20,
                             super::super::snapshot::PaneSnapshot {
+                                native_highlight: None,
                                 cwd: cwd.clone(),
                                 label: None,
                                 agent_name: None,
@@ -1695,6 +1703,7 @@ mod tests {
             (
                 id.parse::<u32>().unwrap(),
                 super::super::snapshot::PaneSnapshot {
+                    native_highlight: None,
                     cwd: cwd.clone(),
                     label: None,
                     agent_name: None,
@@ -1706,6 +1715,7 @@ mod tests {
             )
         };
         let final_pane = super::super::snapshot::PaneSnapshot {
+            native_highlight: None,
             cwd: cwd.clone(),
             label: Some("planner".into()),
             agent_name: Some("planner".into()),
@@ -1858,6 +1868,7 @@ mod tests {
                     panes: HashMap::from([(
                         0,
                         super::super::snapshot::PaneSnapshot {
+                            native_highlight: None,
                             cwd,
                             label: None,
                             agent_name: None,
@@ -2169,6 +2180,7 @@ mod tests {
         panes.insert(
             0,
             super::super::snapshot::PaneSnapshot {
+                native_highlight: None,
                 cwd: cwd.clone(),
                 label: None,
                 agent_name: None,
