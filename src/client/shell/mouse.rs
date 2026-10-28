@@ -1415,6 +1415,19 @@ impl ClientShellState {
             return;
         }
         if matches!(self.overlay, Some(ClientShellOverlay::ContextMenu(_))) {
+            let submenu_open = matches!(
+                self.overlay,
+                Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
+                    open_submenu: true,
+                    ..
+                }))
+            );
+            let submenu_hit = self
+                .hits
+                .context_submenu_rows
+                .iter()
+                .find(|(rect, _)| submenu_open && super::contains(*rect, point))
+                .copied();
             let row_hit = self
                 .hits
                 .context_menu_rows
@@ -1423,17 +1436,36 @@ impl ClientShellState {
                 .copied();
             match mouse.kind {
                 MouseEventKind::Moved => {
-                    if let (Some((_, index)), Some(ClientShellOverlay::ContextMenu(menu))) =
-                        (row_hit, self.overlay.as_mut())
-                    {
-                        menu.highlighted = index;
-                        outcome.repaint = true;
+                    if let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.as_mut() {
+                        if let Some((_, index)) = submenu_hit {
+                            if menu.submenu_highlighted != index {
+                                menu.submenu_highlighted = index;
+                                outcome.repaint = true;
+                            }
+                        } else if let Some((_, index)) = row_hit {
+                            let open = menu
+                                .items()
+                                .get(index)
+                                .is_some_and(|item| item.has_submenu());
+                            if menu.highlighted != index || menu.open_submenu != open {
+                                menu.highlighted = index;
+                                menu.open_submenu = false;
+                                if open {
+                                    menu.open_highlight_submenu();
+                                }
+                                outcome.repaint = true;
+                            }
+                        }
                     }
                 }
-                MouseEventKind::Down(MouseButton::Left) => {
-                    if let Some((_, index)) = row_hit {
+                MouseEventKind::Down(MouseButton::Left | MouseButton::Right) => {
+                    if let Some((_, index)) = submenu_hit {
+                        self.activate_context_swatch(index, outcome);
+                    } else if let Some((_, index)) = row_hit {
                         self.activate_context_menu_item(index, outcome);
-                    } else {
+                    } else if !(super::contains(self.hits.context_menu_area, point)
+                        || submenu_open && super::contains(self.hits.context_submenu_area, point))
+                    {
                         self.overlay = None;
                         outcome.repaint = true;
                     }
@@ -1833,6 +1865,11 @@ impl ClientShellState {
                     }
                 }
                 if !self.config.mouse_capture {
+                    return;
+                }
+                if let Some(pane_id) = self.active_endpoint_agent_pane_at(point) {
+                    self.open_pane_context_menu(pane_id, mouse.column, mouse.row);
+                    outcome.repaint = true;
                     return;
                 }
                 let workspace_id = (!self.sidebar_collapsed)

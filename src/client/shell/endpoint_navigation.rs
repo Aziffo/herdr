@@ -1,6 +1,30 @@
 use super::*;
 
 impl ClientShellState {
+    pub(super) fn active_endpoint_agent_pane_at(&self, point: (u16, u16)) -> Option<String> {
+        let pane_id = if self.hits.endpoint_agents.is_empty() {
+            self.hits
+                .agents
+                .iter()
+                .find(|(rect, _)| super::contains(*rect, point))
+                .map(|(_, pane_id)| pane_id)
+        } else {
+            self.hits
+                .endpoint_agents
+                .iter()
+                .find(|(rect, endpoint_id, _)| {
+                    endpoint_id == &self.active_endpoint_id && super::contains(*rect, point)
+                })
+                .map(|(_, _, pane_id)| pane_id)
+        }?;
+        self.snapshot
+            .as_deref()?
+            .agents
+            .iter()
+            .find(|agent| &agent.pane_id == pane_id)
+            .map(|agent| agent.pane_id.clone())
+    }
+
     pub(super) fn active_endpoint_workspace_at(&self, point: (u16, u16)) -> Option<String> {
         self.hits
             .workspaces

@@ -601,24 +601,29 @@ impl ClientShellState {
 
         if matches!(self.overlay, Some(ClientShellOverlay::ContextMenu(_))) {
             match key.code {
-                KeyCode::Esc => {
-                    self.overlay = None;
+                KeyCode::Esc | KeyCode::Left => {
+                    if !self.close_context_submenu() && key.code == KeyCode::Esc {
+                        self.overlay = None;
+                    }
                     outcome.repaint = true;
                 }
-                KeyCode::Up => {
-                    self.move_context_menu_selection(-1);
+                KeyCode::Up | KeyCode::Down => {
+                    self.move_context_menu_selection(if key.code == KeyCode::Up { -1 } else { 1 });
                     outcome.repaint = true;
                 }
-                KeyCode::Down => {
-                    self.move_context_menu_selection(1);
+                KeyCode::Right => {
+                    self.open_context_submenu();
                     outcome.repaint = true;
                 }
                 KeyCode::Enter => {
-                    let highlighted = match self.overlay.as_ref() {
-                        Some(ClientShellOverlay::ContextMenu(menu)) => menu.highlighted,
-                        _ => return,
+                    let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.as_ref() else {
+                        return;
                     };
-                    self.activate_context_menu_item(highlighted, outcome);
+                    if menu.open_submenu {
+                        self.activate_context_swatch(menu.submenu_highlighted, outcome);
+                    } else {
+                        self.activate_context_menu_item(menu.highlighted, outcome);
+                    }
                 }
                 _ => {}
             }

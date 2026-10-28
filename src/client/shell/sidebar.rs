@@ -168,6 +168,11 @@ pub(crate) fn render_collapsed_sidebar(
             status_icon(agent.agent_status, config.status_indicators),
             Style::default().fg(status_color(agent.agent_status, palette)),
         );
+        if let Some(color) = token_color(&agent.tokens, "highlight_pane") {
+            if !rect.is_empty() {
+                buffer[(rect.x, rect.y)].set_fg(palette.highlight_color(color));
+            }
+        }
         hits.agents.push((rect, pane_id));
     }
     hits.sidebar_toggle = if area.is_empty() || workspace_area.width == 0 {

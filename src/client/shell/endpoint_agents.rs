@@ -37,6 +37,11 @@ pub(super) fn render_collapsed(
                     Modifier::empty()
                 }),
         );
+        if let Some(color) = row.agent.highlight {
+            if !rect.is_empty() {
+                buffer[(rect.x, rect.y)].set_fg(config.palette.highlight_color(color));
+            }
+        }
         hits.endpoint_agents
             .push((rect, row.endpoint_id, row.agent.pane_id));
     }
